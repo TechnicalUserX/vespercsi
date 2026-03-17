@@ -1,0 +1,6 @@
+CompileFlags:
+    Add:
+        - -I/home/tux/Projects/VesperCSI/src
+        - -I/home/tux/Projects/VesperCSI/lib
+        - -I/usr/include/libnl3
+    Compiler: clang
