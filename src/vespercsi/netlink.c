@@ -70,6 +70,19 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
         break;
     }
 
+    if (command->handler){
+        err = command->handler(netlink, msg, command->args);
+    }
+
+    if(err){
+        nl_cb_put(cb);
+        nl_cb_put(s_cb);
+        nlmsg_free(msg);           
+        return VESPERCSI_FAIL;
+    }
+
+    nl_socket_set_cb(netlink->netlink_socket, s_cb);
+
     err = nl_send_auto_complete(netlink->netlink_socket, msg);
 
     if(err < 0){
@@ -87,18 +100,15 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
         nl_recvmsgs(netlink->netlink_socket, cb);
     }
 
+    nl_cb_put(cb);
+    nl_cb_put(s_cb);
+    nlmsg_free(msg);        
+
     if(err == 0){
-        nl_cb_put(cb);
-        nl_cb_put(s_cb);
-        nlmsg_free(msg);        
         return VESPERCSI_OK;
     }
 
-failure:
-    nl_cb_put(cb);
-    nl_cb_put(s_cb);
-    nlmsg_free(msg);
-    LOG(FAIL, "nl_recvmsgs() failure");
+    LOG(FAIL, "nl_recvmsgs() failure: %s", strerror(-err));
     return VESPERCSI_FAIL;
 nla_put_failure:
     LOG(FAIL, "NLA_PUT_32() failure");
@@ -116,7 +126,7 @@ int vespercsi_netlink_error_handler(struct sockaddr_nl *nla, struct nlmsgerr *er
     struct nlattr *tb[NLMSGERR_ATTR_MAX + 1];
     int *ret = (int *)arg;
     int ack_len = sizeof(*nlh) + sizeof(int) + sizeof(*nlh);
-
+    
     if (err->error > 0)
     {
         /*
@@ -134,26 +144,33 @@ int vespercsi_netlink_error_handler(struct sockaddr_nl *nla, struct nlmsgerr *er
         *ret = err->error;
     }
 
-    if (!(nlh->nlmsg_flags & NLM_F_ACK_TLVS))
+    if (!(nlh->nlmsg_flags & NLM_F_ACK_TLVS)){
         return NL_STOP;
+    }
 
-    if (!(nlh->nlmsg_flags & NLM_F_CAPPED))
+    if (!(nlh->nlmsg_flags & NLM_F_CAPPED)){
+
         ack_len += err->msg.nlmsg_len - sizeof(*nlh);
+    }
 
-    if (len <= ack_len)
+    if (len <= ack_len){
         return NL_STOP;
+    }
 
     attrs = (struct nlattr *)((unsigned char *)nlh + ack_len);
     len -= ack_len;
 
+    
     nla_parse(tb, NLMSGERR_ATTR_MAX, attrs, len, NULL);
     if (tb[NLMSGERR_ATTR_MSG])
     {
+        LOG(FAIL, "Kernel says: %s", (char *)nla_data(tb[NLMSGERR_ATTR_MSG]));
         len = strnlen((char *)nla_data(tb[NLMSGERR_ATTR_MSG]),
                       nla_len(tb[NLMSGERR_ATTR_MSG]));
-
         exit(EXIT_FAILURE);
         //throw std::ios_base::failure("kernel reports: " + std::string((char *)nla_data(tb[NLMSGERR_ATTR_MSG])) + "\n");
+    }else{
+        printf("no?\n");
     }
 
     return NL_STOP;

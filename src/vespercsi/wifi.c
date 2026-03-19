@@ -7,7 +7,7 @@ vespercsi_wifi_controller_t vespercsi_wifi_controller = {0};
 
 // API
 
-void vespercsi_wifi_get_phys(vespercsi_netlink_t* netlink){
+void vespercsi_wifi_get_phys(vespercsi_wifi_controller_t* controller){
     vespercsi_netlink_command_t command = {
         .id = NL80211_CMD_GET_WIPHY,
         .idby = VESPERCSI_NETLINK_CIB_NONE,
@@ -16,10 +16,10 @@ void vespercsi_wifi_get_phys(vespercsi_netlink_t* netlink){
         .valid_handler = vespercsi_wifi_get_phys_handler,
     };
 
-    vespercsi_netlink_execute(netlink, &command);
+    vespercsi_netlink_execute(&controller->netlink, &command);
 }
 
-void vespercsi_wifi_get_interfaces(vespercsi_netlink_t* netlink){
+void vespercsi_wifi_get_interfaces(vespercsi_wifi_controller_t* controller){
 
     vespercsi_netlink_command_t command = {
         .id = NL80211_CMD_GET_INTERFACE,
@@ -29,10 +29,10 @@ void vespercsi_wifi_get_interfaces(vespercsi_netlink_t* netlink){
         .valid_handler = vespercsi_wifi_get_interfaces_handler,
     };
 
-    vespercsi_netlink_execute(netlink, &command);
+    vespercsi_netlink_execute(&controller->netlink, &command);
 }
 
-void vespercsi_wifi_get_single_interface(vespercsi_netlink_t* netlink, vespercsi_wifi_interface_t* interface, const char *ifname){
+void vespercsi_wifi_get_single_interface(vespercsi_wifi_controller_t* controller, vespercsi_wifi_interface_t* interface, const char *ifname){
 
     vespercsi_netlink_command_t command = {
         .id = NL80211_CMD_GET_INTERFACE,
@@ -44,10 +44,10 @@ void vespercsi_wifi_get_single_interface(vespercsi_netlink_t* netlink, vespercsi
         .args = (void*)interface
     };
 
-    vespercsi_netlink_execute(netlink, &command);
+    vespercsi_netlink_execute(&controller->netlink, &command);
 }
 
-void vespercsi_wifi_remove_interface(vespercsi_netlink_t* netlink, const char *name, int index){
+void vespercsi_wifi_remove_interface(vespercsi_wifi_controller_t* controller, const char *name, int index){
     vespercsi_netlink_command_t command = {
         .id = NL80211_CMD_DEL_INTERFACE,
         .idby = VESPERCSI_NETLINK_CIB_NETDEV,
@@ -57,10 +57,10 @@ void vespercsi_wifi_remove_interface(vespercsi_netlink_t* netlink, const char *n
         .valid_handler = NULL,
     };
 
-    vespercsi_netlink_execute(netlink, &command);
+    vespercsi_netlink_execute(&controller->netlink, &command);
 }
 
-void vespercsi_wifi_set_interface_frequency(vespercsi_netlink_t* netlink, const char* ifname, uint16_t freq, const char *bw){
+void vespercsi_wifi_set_interface_frequency(vespercsi_wifi_controller_t* controller, const char* ifname, uint16_t freq, const char *bw){
     
     const void *settings[] = {&freq, bw};
 
@@ -74,10 +74,10 @@ void vespercsi_wifi_set_interface_frequency(vespercsi_netlink_t* netlink, const 
         .args = settings,
     };
 
-    vespercsi_netlink_execute(netlink, &command);
+    vespercsi_netlink_execute(&controller->netlink, &command);
 }
 
-void vespercsi_wifi_set_tx_power(vespercsi_netlink_t* netlink, const char* ifname){
+void vespercsi_wifi_set_tx_power(vespercsi_wifi_controller_t* controller, const char* ifname){
     
     vespercsi_netlink_command_t command = {
         .id = NL80211_CMD_SET_WIPHY,
@@ -87,10 +87,10 @@ void vespercsi_wifi_set_tx_power(vespercsi_netlink_t* netlink, const char* ifnam
         .handler = vespercsi_wifi_set_tx_power_handler,
     };
 
-    vespercsi_netlink_execute(netlink, &command);
+    vespercsi_netlink_execute(&controller->netlink, &command);
 }
 
-int vespercsi_set_interface_updown(const char *ifname, bool up){
+int vespercsi_wifi_set_interface_updown(const char *ifname, bool up){
     // Create a socket file descriptor
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0)
@@ -130,18 +130,13 @@ int vespercsi_set_interface_updown(const char *ifname, bool up){
     close(sockfd);
 
 
-    LOG_VERBOSE(INFO, "Interface %s has been brought %s", (up ? "up" : "down"));
+    LOG_VERBOSE(INFO, "Interface %s has been brought %s", ifname, (up ? "up" : "down"));
 
     return 0;
 }
 
-void vespercsi_wifi_add_device(vespercsi_netlink_t* netlink, const char *name, uint64_t phy_id, const enum nl80211_iftype type)
+void vespercsi_wifi_add_device(vespercsi_wifi_controller_t* controller, const char *name, uint64_t phy_id, const enum nl80211_iftype type)
 {
-    if (vespercsi_wifi_controller.phys_size == 0)
-    {
-        LOG(FAIL,"No phys")
-        return;
-    }
 
     const void *settings[] = {name, &type};
 
@@ -149,12 +144,14 @@ void vespercsi_wifi_add_device(vespercsi_netlink_t* netlink, const char *name, u
         .id = NL80211_CMD_NEW_INTERFACE,
         .idby = VESPERCSI_NETLINK_CIB_PHY,
         .nlFlags = 0,
-        .device = phy_id,
+        .device = 0,
         .handler = vespercsi_wifi_add_device_handler,
         .valid_handler = NULL,
         .args = settings,
     };
-    vespercsi_netlink_execute(netlink, &command);
+    
+    vespercsi_netlink_execute(&controller->netlink, &command);
+
 }
 
 // Handlers
@@ -191,7 +188,7 @@ int vespercsi_wifi_get_interfaces_handler(struct nl_msg *msg, void *arg){
     }
     if (tb_msg[NL80211_ATTR_MAC])
     {
-        vespercsi_wifi_mac_hexstring(new_interface.mac, (const unsigned char *)nla_data(tb_msg[NL80211_ATTR_MAC]));
+        vespercsi_wifi_mac_string(new_interface.mac, (const unsigned char *)nla_data(tb_msg[NL80211_ATTR_MAC]));
     }
     if (tb_msg[NL80211_ATTR_SSID])
     {
@@ -274,7 +271,7 @@ int vespercsi_wifi_get_single_interface_handler(struct nl_msg *msg, void *arg){
     }
 
     if(tb_msg[NL80211_ATTR_MAC]){
-        vespercsi_wifi_mac_hexstring(current_interface->mac, (const unsigned char *)nla_data(tb_msg[NL80211_ATTR_MAC]));
+        vespercsi_wifi_mac_string(current_interface->mac, (const unsigned char *)nla_data(tb_msg[NL80211_ATTR_MAC]));
 
     }else{
         strcpy(current_interface->mac, "");
@@ -400,7 +397,6 @@ int vespercsi_wifi_get_phys_handler(struct nl_msg *msg, void *arg){
 
     if (tb_msg[NL80211_ATTR_WIPHY])
     {
-        LOG(WARN,"FIRST")
         int64_t phyId = nla_get_u32(tb_msg[NL80211_ATTR_WIPHY]);
         vespercsi_wifi_controller.phys[vespercsi_wifi_controller.phys_size].index = phyId;
     }
@@ -431,14 +427,14 @@ nla_put_failure:
 }
 
 int vespercsi_wifi_add_device_handler(vespercsi_netlink_t *state, struct nl_msg *msg, void *arg){
+
     void **settings = (void **)arg;
     const char *name = (const char *)settings[0];
     enum nl80211_iftype *type = (enum nl80211_iftype *)(settings[1]);
 
     NLA_PUT_STRING(msg, NL80211_ATTR_IFNAME, name);
     NLA_PUT_U32(msg, NL80211_ATTR_IFTYPE, *type);
-    NLA_PUT(msg, NL80211_ATTR_MAC, ETH_ALEN, vespercsi_options.mac);
-
+    NLA_PUT(msg, NL80211_ATTR_MAC, ETH_ALEN, vespercsi_options.interface_mac);
     return 0;
 nla_put_failure:
     return -ENOBUFS;
@@ -446,7 +442,7 @@ nla_put_failure:
 
 // Utility
 
-void vespercsi_wifi_mac_hexstring(char* dest, const uint8_t *src){
+void vespercsi_wifi_mac_string(char* dest, const uint8_t *src){
     if(dest == NULL || src == NULL){
         return;
     }
@@ -631,7 +627,7 @@ int vespercsi_wifi_get_cf1(const struct vespercsi_wifi_channel_mode_t *chanmode,
     return cf1;
 }
 
-uint16_t vespercsi_wifi_channel_mode_to_Width(vespercsi_wifi_channel_mode_t* chanMode){
+uint16_t vespercsi_wifi_channel_mode_to_width(vespercsi_wifi_channel_mode_t* chanMode){
     switch (chanMode->width)
     {
     case NL80211_CHAN_WIDTH_20:
@@ -688,4 +684,59 @@ bool vespercsi_wifi_check_phy_mac(const char* phy_name, const char* target_mac){
     }
 
     return false;
+}
+
+int vespercsi_wifi_toggle_iwlwifi(bool enable){
+
+    const char *baseDir = "/sys/kernel/debug/iwlwifi";
+    DIR *dir;
+    struct dirent *entry;
+    bool csi_enabled = false;
+    char path[PATH_MAX];
+
+    // 1. Try to open the base directory
+    dir = opendir(baseDir);
+    if (!dir) {
+        LOG(FAIL, "/sys/kernel/debug/iwlwifi not found. Did you compile iwlwifi with debugfs enabled?");
+        return VESPERCSI_FAIL;
+    }
+
+    // 2. Iterate through the directory contents
+    while ((entry = readdir(dir)) != NULL) {
+        // Skip the standard "." and ".." hidden directories
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        // Construct the full path: /sys/kernel/debug/iwlwifi/<pci-id>/iwlmvm/csi_enabled
+        snprintf(path, sizeof(path), "%s/%s/iwlmvm/csi_enabled", baseDir, entry->d_name);
+
+        // 3. Check if the file exists using access()
+        if (access(path, F_OK) == 0) {
+            
+            // 4. Open, write, and close
+            FILE *f = fopen(path, "w");
+            if (f) {
+                fprintf(f, "%s\n", enable ? "1" : "0");
+                fflush(f);
+                fclose(f);
+                
+                LOG(INFO, "Successfully %s iwlwifi CSI measurement on %s", 
+                    enable ? "enabled" : "disabled", entry->d_name);
+                csi_enabled = true;
+            } else {
+                LOG(FAIL, "Found csi_enabled file but lacked write permissions: %s", path);
+            }
+        }
+    }
+
+    closedir(dir);
+
+    // 5. Check if we actually found and wrote to at least one valid card
+    if (!csi_enabled) {
+        LOG(FAIL, "Failed to enable CSI measurement. Device might not support it or iwlmvm is not loaded.");
+        return VESPERCSI_FAIL;
+    }
+
+    return VESPERCSI_OK;
 }

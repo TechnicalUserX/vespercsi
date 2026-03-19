@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <rs.h>
 
 #define ETH_ALEN 6
 
@@ -18,15 +19,33 @@ typedef struct vespercsi_options_t{
     uint8_t tx_power;
     uint32_t antenna;
     char format[16];
-    uint8_t mac[ETH_ALEN];
+
+    // Prints More Information
     bool verbose;
-    bool log_file;
+
+    bool interface_mac_set;
+    uint8_t interface_mac[ETH_ALEN];
+    
+    // Logging File
+    bool log_file_set;
     char log_file_path[512];
+
+    // CSI File
+    bool out_file_set;
+    char out_file_path[512];
     bool quiet;
+
+    // UDP Socket
+    bool udp_port_set;
+    uint16_t udp_port;
 }vespercsi_options_t;
 
 extern vespercsi_options_t vespercsi_options;
 
 void vespercsi_options_parse(int argc, char* argv[]);
+
+void vespercsi_options_check_mandatory();
+
+void vespercsi_options_print_usage();
 
 #endif

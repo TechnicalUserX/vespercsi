@@ -10,7 +10,7 @@ void vespercsi_log(vespercsi_log_level_t log_level, const char* format, ...){
     static FILE* log_file = NULL;
 
     if(log_file == NULL){
-        if(vespercsi_options.log_file){
+        if(vespercsi_options.log_file_set){
             log_file = fopen(vespercsi_options.log_file_path, "a");
 
             if(log_file == NULL){
