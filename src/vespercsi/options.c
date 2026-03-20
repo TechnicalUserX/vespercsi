@@ -17,10 +17,10 @@ vespercsi_options_t vespercsi_options = {
     .out_file_set = false,
     .out_file_path = "",
     .quiet = false,
-    .udp_port_set = false,
-    .udp_port = 8000,
     .bandwidth = "20",
-    .tx_power = 10
+    .tx_power = 10,
+    .src_mac_set = false,
+    .src_mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66}
 
 };
 
@@ -37,15 +37,16 @@ void vespercsi_options_parse(int argc, char* argv[]){
         { "version",        no_argument,        NULL,   1000},
         { "log-file",       required_argument,  NULL,   'l'},
         { "out-file",       required_argument,  NULL,   'o'}, 
-        { "quiet",          no_argument,        NULL,   'q'},
-       { "udp",            required_argument,  NULL,   'u'},
+       { "quiet",          no_argument,        NULL,   'q'},
+       { "src-mac",        required_argument,  NULL,   's'},
+       { "config-file",    required_argument,  NULL,   'c'},
        { NULL,             0,                  NULL,   0  }   
     };
 
     optind = 0;
     int opt = 0;
     
-    while((opt = getopt_long(argc, argv, ":vhi:f:t:w:l:o:qu:p:",long_options,NULL)) != -1){
+    while((opt = getopt_long(argc, argv, ":vhi:f:t:w:l:o:qu:p:s:c:",long_options,NULL)) != -1){
 
         switch(opt){
     
@@ -65,16 +66,6 @@ void vespercsi_options_parse(int argc, char* argv[]){
                 vespercsi_options.quiet = true;
             }break;            
 
-            case 'u':{
-                unsigned long int port = strtoul(optarg, NULL, 10);
-                if(port > 65535){
-                    printf("VesperCSI: Bad UDP Port\n");
-                    exit(EXIT_FAILURE);
-                }
-                vespercsi_options.udp_port_set = true;
-                vespercsi_options.udp_port = port;
-            }break;
-
             case 'l':{
                 vespercsi_options.log_file_set = true;
                 strncpy(vespercsi_options.log_file_path, optarg, 512-1);
@@ -84,6 +75,11 @@ void vespercsi_options_parse(int argc, char* argv[]){
                 vespercsi_options.out_file_set = true;
                 strncpy(vespercsi_options.out_file_path, optarg, 512-1);
             }break;            
+
+            case 'c':{
+                vespercsi_options.config_file_set = true;
+                strncpy(vespercsi_options.config_file_path, optarg, 512-1);
+            }break;  
 
             case 'f':{
                 int f = atoi(optarg);
@@ -125,6 +121,18 @@ void vespercsi_options_parse(int argc, char* argv[]){
                     exit(EXIT_FAILURE);
                 }
                 vespercsi_options.interface_mac_set = true;
+
+            }break;
+
+            case 's':{
+                int res = sscanf(optarg, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", 
+                    &vespercsi_options.src_mac[0], &vespercsi_options.src_mac[1], &vespercsi_options.src_mac[2], &vespercsi_options.src_mac[3], &vespercsi_options.src_mac[4], &vespercsi_options.src_mac[5]);
+
+                if(res != ETH_ALEN){
+                    printf("VesperCSI: Source MAC cannot be parsed\n");
+                    exit(EXIT_FAILURE);
+                }
+                vespercsi_options.src_mac_set = true;
 
             }break;
 

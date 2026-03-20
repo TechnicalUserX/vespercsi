@@ -1,13 +1,12 @@
-
-#include <linux/nl80211.h>
-#include <net/if.h>
-#include <stdbool.h>
 #include <vespercsi/netlink.h>
 #include <vespercsi/vespercsi.h>
 #include <vespercsi/options.h>
 #include <vespercsi/log.h>
 #include <vespercsi/wifi.h>
 #include <vespercsi/csi.h>
+#include <vespercsi/signal.h>
+#include <vespercsi/config.h>
+#include <vespercsi/plugin.h>
 
 int main(int argc, char* argv[]){
 
@@ -15,24 +14,20 @@ int main(int argc, char* argv[]){
 
     vespercsi_options_check_mandatory();
 
-    LOG(INFO, "VesperCSI Started");
+    vespercsi_config_init(&vespercsi_config);
 
-    if(vespercsi_netlink_init(&vespercsi_wifi_controller.netlink) == VESPERCSI_FAIL){
-       LOG(FAIL, "Cannot initalize Wi-Fi Controller netlink");
-       exit(EXIT_FAILURE); 
-    }
+    vespercsi_plugin_load();
     
-    if(vespercsi_netlink_init(&vespercsi_csi_controller.netlink) == VESPERCSI_FAIL){
-       LOG(FAIL, "Cannot initalize CSI Controller netlink");
-       exit(EXIT_FAILURE); 
-    }
+    vespercsi_wifi_controller_init(&vespercsi_wifi_controller);
 
+    vespercsi_csi_controller_init(&vespercsi_csi_controller);
+
+    LOG(INFO, "VesperCSI Started");
 
     vespercsi_wifi_get_interfaces(&vespercsi_wifi_controller);
     
     vespercsi_wifi_get_phys(&vespercsi_wifi_controller);
 
-    
     char interface_mac_string[VESPERCSI_WIFI_MAC_STR_SIZE] = {0};
     vespercsi_wifi_mac_string(interface_mac_string, vespercsi_options.interface_mac);
 
@@ -76,12 +71,20 @@ int main(int argc, char* argv[]){
         vespercsi_wifi_get_single_interface(&vespercsi_wifi_controller, &current_interface, VESPERCSI_WIFI_MONITOR_INTERFACE);
     }while(current_interface.freq != vespercsi_options.frequency);
 
+    // This may not work in many wifi cards
     vespercsi_wifi_set_tx_power(&vespercsi_wifi_controller, VESPERCSI_WIFI_MONITOR_INTERFACE);
 
-    LOG(DEBG, "TX POWER: %d",vespercsi_options.tx_power);
+    if(vespercsi_wifi_toggle_iwlwifi(true) == VESPERCSI_FAIL){
+        LOG(FAIL, "Cannot enable CSI capturing on the interface %s", VESPERCSI_WIFI_MONITOR_INTERFACE);
+        exit(EXIT_FAILURE);
+    }
 
-    LOG(DEBG,"%u", current_interface.freq);
+    vespercsi_csi_consume_start();
 
+    vespercsi_csi_capture_start();
+
+    // Command server
+    pause();
 
     return EXIT_SUCCESS;
 }

@@ -1,6 +1,7 @@
 #ifndef VESPERCSI_OPTIONS_H
 #define VESPERCSI_OPTIONS_H
 
+#include <vespercsi/vespercsi.h>
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,11 +34,16 @@ typedef struct vespercsi_options_t{
     // CSI File
     bool out_file_set;
     char out_file_path[512];
+
     bool quiet;
 
-    // UDP Socket
-    bool udp_port_set;
-    uint16_t udp_port;
+    // Filter Incoming Packet By Source MAC
+    bool src_mac_set;
+    uint8_t src_mac[ETH_ALEN];
+
+    // Configuration File for Extra Functionality
+    bool config_file_set;
+    char config_file_path[512];
 }vespercsi_options_t;
 
 extern vespercsi_options_t vespercsi_options;

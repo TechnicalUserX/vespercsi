@@ -1,6 +1,8 @@
 CompileFlags:
     Add:
-        - -I/home/tux/Projects/VesperCSI/src
-        - -I/home/tux/Projects/VesperCSI/lib
-        - -I/usr/include/libnl3
+        - -I/home/tux/VesperCSI/vespercsi/src
+        - -I/home/tux/VesperCSI/vespercsi/lib
+        - -I/home/tux/VesperCSI/VesperOS/output/staging/usr/include
+        - -I/home/tux/VesperCSI/VesperOS/output/staging/usr/include/libnl3
+        
     Compiler: clang

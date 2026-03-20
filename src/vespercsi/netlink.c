@@ -15,7 +15,7 @@ int vespercsi_netlink_init(vespercsi_netlink_t* netlink){
         return VESPERCSI_FAIL;
     }
 
-    nl_socket_set_buffer_size(netlink->netlink_socket, 8192, 8192);
+    nl_socket_set_buffer_size(netlink->netlink_socket, 16000, 16000);
 
     int err = 1;
     setsockopt(nl_socket_get_fd(netlink->netlink_socket), SOL_NETLINK, NETLINK_EXT_ACK, &err, sizeof(err));

@@ -698,12 +698,12 @@ fi
 # Default Compiler, Preprocessor, 
 # and Linker Flags (MODIFY HERE)
 
-CC="gcc"
+CC="/home/tux/VesperCSI/VesperOS/output/host/bin/aarch64-buildroot-linux-gnu-gcc"
 CXX="g++"
-CFLAGS="-Wall -I\"${ROOT_DIR}/src\" -I\"${ROOT_DIR}/lib\" -I/usr/include/libnl3"
+CFLAGS="-Werror --sysroot=\"/home/tux/VesperCSI/VesperOS/output/staging\" -Wall -I\"${ROOT_DIR}/src\" -I\"${ROOT_DIR}/lib\" -I/home/tux/VesperCSI/VesperOS/output/staging/usr/include/libnl3"
 CPPFLAGS=""
 CXXFLAGS=""
-LDFLAGS="-lnl-genl-3 -lnl-3 -lm" 
+LDFLAGS="-lnl-genl-3 -lnl-3 -lm -lconfig" 
 
 ########################################
 # Directories (MODIFY HERE)

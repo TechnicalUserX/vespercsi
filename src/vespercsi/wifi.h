@@ -1,6 +1,7 @@
 #ifndef VESPERCSI_WIFI_H
 #define VESPERCSI_WIFI_H
 
+#include <vespercsi/vespercsi.h>
 #include <linux/netlink.h>
 #include <netlink/msg.h>
 #include <linux/nl80211.h>
@@ -17,7 +18,7 @@
 #define VESPERCSI_WIFI_PHY_MAX_SIZE 10
 
 #define VESPERCSI_WIFI_INTERFACE_NAME_STR_SIZE 64
-#define VESPERCSI_WIFI_PHY_NAME_STR_SIZE 8
+#define VESPERCSI_WIFI_PHY_NAME_STR_SIZE 32
 #define VESPERCSI_WIFI_MAC_STR_SIZE 18
 
 #define VESPERCSI_WIFI_MONITOR_INTERFACE "vespercsimon"
@@ -62,6 +63,8 @@ typedef struct vespercsi_wifi_controller_t{
 extern vespercsi_wifi_controller_t vespercsi_wifi_controller;
 
 // API
+
+void vespercsi_wifi_controller_init(vespercsi_wifi_controller_t* controller);
 
 void vespercsi_wifi_get_phys(vespercsi_wifi_controller_t* controller);
 

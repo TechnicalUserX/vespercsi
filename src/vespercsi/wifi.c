@@ -7,6 +7,15 @@ vespercsi_wifi_controller_t vespercsi_wifi_controller = {0};
 
 // API
 
+void vespercsi_wifi_controller_init(vespercsi_wifi_controller_t* controller){
+
+    if(vespercsi_netlink_init(&controller->netlink) == VESPERCSI_FAIL){
+       fprintf(stdout, "VesperCSI: Cannot initalize Wi-Fi Controller netlink");
+       exit(EXIT_FAILURE); 
+    }
+    
+}
+
 void vespercsi_wifi_get_phys(vespercsi_wifi_controller_t* controller){
     vespercsi_netlink_command_t command = {
         .id = NL80211_CMD_GET_WIPHY,
@@ -144,7 +153,7 @@ void vespercsi_wifi_add_device(vespercsi_wifi_controller_t* controller, const ch
         .id = NL80211_CMD_NEW_INTERFACE,
         .idby = VESPERCSI_NETLINK_CIB_PHY,
         .nlFlags = 0,
-        .device = 0,
+        .device = phy_id,
         .handler = vespercsi_wifi_add_device_handler,
         .valid_handler = NULL,
         .args = settings,
@@ -393,20 +402,14 @@ int vespercsi_wifi_get_phys_handler(struct nl_msg *msg, void *arg){
               genlmsg_attrlen(gnlh, 0), NULL);
 
 
-    vespercsi_wifi_phy_t new_phy = {0};
-
-    if (tb_msg[NL80211_ATTR_WIPHY])
-    {
-        int64_t phyId = nla_get_u32(tb_msg[NL80211_ATTR_WIPHY]);
-        vespercsi_wifi_controller.phys[vespercsi_wifi_controller.phys_size].index = phyId;
-    }
-
-    if(tb_msg[NL80211_ATTR_WIPHY_NAME]) {
-        // 1. Extract the "phy0" string from Netlink
-        strncpy(vespercsi_wifi_controller.phys[vespercsi_wifi_controller.phys_size].name,
-                nla_get_string(tb_msg[NL80211_ATTR_WIPHY_NAME]), 31);
-        vespercsi_wifi_controller.phys_size++;
-
+    if (tb_msg[NL80211_ATTR_WIPHY] && tb_msg[NL80211_ATTR_WIPHY_NAME]) {
+        if (vespercsi_wifi_controller.phys_size < VESPERCSI_WIFI_PHY_MAX_SIZE) {
+            vespercsi_wifi_controller.phys[vespercsi_wifi_controller.phys_size].index =
+                nla_get_u32(tb_msg[NL80211_ATTR_WIPHY]);
+            strncpy(vespercsi_wifi_controller.phys[vespercsi_wifi_controller.phys_size].name,
+                    nla_get_string(tb_msg[NL80211_ATTR_WIPHY_NAME]), 31);
+            vespercsi_wifi_controller.phys_size++;
+        }
     }
 
 

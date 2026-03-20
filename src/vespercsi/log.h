@@ -3,6 +3,7 @@
 
 // DO NOT USE THE LOG FUNCTION INSIDE CAPTURE AND CONSUME THREADS
 
+#include <vespercsi/vespercsi.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,6 +33,8 @@ typedef enum vespercsi_log_level_t{
 #define LOG(level, format, ...) {vespercsi_log(level, format, ##__VA_ARGS__);}
 
 #define LOG_VERBOSE(level, format, ...) if(vespercsi_options.verbose){vespercsi_log(level, format, ##__VA_ARGS__);}
+
+extern FILE* vespercsi_log_file;
 
 void vespercsi_log(vespercsi_log_level_t log_level, const char* format, ...);
 
