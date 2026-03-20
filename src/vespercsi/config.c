@@ -11,7 +11,7 @@ void vespercsi_config_init(vespercsi_config_t* config){
 
     config_t cfg = {0};
 
-    if (!config_read_file(&cfg, "example.conf")) {
+    if (!config_read_file(&cfg, vespercsi_options.config_file_path)) {
         fprintf(stdout, "VesperCSI: config error: %s (line %d)\n",
             config_error_text(&cfg),
             config_error_line(&cfg));
@@ -41,7 +41,7 @@ void vespercsi_config_init(vespercsi_config_t* config){
     }
 
     if(config_lookup_int(&cfg, "runners.capture.priority", &temp_int)){
-        if(temp_int < 0 || temp_int > 31){
+        if(temp_int < 0 || temp_int > 99){
             fprintf(stdout, "VesperCSI: config error: invalid priority, valid options: 0-99");
             exit(EXIT_FAILURE);
         }
@@ -50,7 +50,7 @@ void vespercsi_config_init(vespercsi_config_t* config){
     }
 
     if(config_lookup_int(&cfg, "runners.consume.priority", &temp_int)){
-        if(temp_int < 0 || temp_int > 31){
+        if(temp_int < 0 || temp_int > 99){
             fprintf(stdout, "VesperCSI: config error: invalid priority, valid options: 0-99");
             exit(EXIT_FAILURE);
         }

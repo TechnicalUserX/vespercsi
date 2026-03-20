@@ -36,6 +36,9 @@ typedef enum vespercsi_log_level_t{
 
 extern FILE* vespercsi_log_file;
 
+void vespercsi_log_init(void);
+
 void vespercsi_log(vespercsi_log_level_t log_level, const char* format, ...);
+
 
 #endif

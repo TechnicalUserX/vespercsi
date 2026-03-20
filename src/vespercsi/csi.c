@@ -39,12 +39,12 @@ void vespercsi_csi_controller_init(vespercsi_csi_controller_t* controller){
 }
 
 void vespercsi_csi_capture_start(void){
-    LOG_VERBOSE(INFO, "Capture Runner started");
+    LOG(INFO, "Capture Runner started");
     pthread_create(&vespercsi_csi_controller.runner_capture_thread, NULL, vespercsi_csi_capture_runner, NULL);
 }
 
 void vespercsi_csi_consume_start(void){
-    LOG_VERBOSE(INFO, "Consume Runner started");
+    LOG(INFO, "Consume Runner started");
     pthread_create(&vespercsi_csi_controller.runner_consume_thread, NULL, vespercsi_csi_consume_runner, NULL);
 }
 
@@ -255,19 +255,19 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
 
                     switch(status){
                         case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_SUCCESS:{
-                            LOG_VERBOSE(PASS, "Pushed CSI %lu", counter);
+                            LOG_VERBOSE(DEBG, "Pushed CSI %lu", counter);
                         }break;
 
                         case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NO_MEMORY:{
-                            LOG_VERBOSE(WARN, "No memory to push CSI");
+                            LOG_VERBOSE(DEBG, "No memory to push CSI");
                         }break;
 
                         case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NULL_VALUE:{
-                            LOG_VERBOSE(WARN, "Null value whiile pushing CSI");
+                            LOG_VERBOSE(DEBG, "Null value whiile pushing CSI");
                         }break;
 
                         case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_EMPTY:{
-                            LOG_VERBOSE(WARN, "Empty buffer?");
+                            LOG_VERBOSE(DEBG, "Empty buffer?");
                         }break;                        
                         
                         default:break;
@@ -277,7 +277,7 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
                     vespercsi_wifi_mac_string(mac_string, current_csi_metadata.header.src_mac);
 
                     atomic_store_explicit(&vespercsi_capture_dirty_flag, 1, memory_order_release);
-                    LOG_VERBOSE(INFO, "CSI Capture %lu from %s at %lu", counter, mac_string, current_csi_metadata.header.timestamp);
+                    LOG_VERBOSE(INFO, "CSI Capture");
                 }
 
             }

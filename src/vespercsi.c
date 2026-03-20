@@ -1,5 +1,5 @@
-#include <vespercsi/netlink.h>
 #include <vespercsi/vespercsi.h>
+#include <vespercsi/netlink.h>
 #include <vespercsi/options.h>
 #include <vespercsi/log.h>
 #include <vespercsi/wifi.h>
@@ -9,20 +9,23 @@
 #include <vespercsi/plugin.h>
 
 int main(int argc, char* argv[]){
-
+    vespercsi_banner();
+    
     vespercsi_options_parse(argc, argv);
 
     vespercsi_options_check_mandatory();
 
+    vespercsi_log_init();
+
+    vespercsi_signal_init();
+
     vespercsi_config_init(&vespercsi_config);
 
     vespercsi_plugin_load();
-    
+
     vespercsi_wifi_controller_init(&vespercsi_wifi_controller);
 
     vespercsi_csi_controller_init(&vespercsi_csi_controller);
-
-    LOG(INFO, "VesperCSI Started");
 
     vespercsi_wifi_get_interfaces(&vespercsi_wifi_controller);
     

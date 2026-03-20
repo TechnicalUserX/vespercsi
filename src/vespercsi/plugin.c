@@ -20,24 +20,33 @@ void vespercsi_plugin_load(void){
     dlerror();
 
     // Required symbol
-    vespercsi_plugin_function_main callback = 
-        (vespercsi_plugin_function_main)dlsym(handle, "vespercsi_plugin_consume");
+    vespercsi_plugin_function_callback_t callback = (vespercsi_plugin_function_callback_t)dlsym(handle, "vespercsi_plugin_function_callback");
 
     const char* err = dlerror();
     if (err) {
-        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_consume: %s", err);
+        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_callback: %s", err);
         dlclose(handle);
         exit(EXIT_FAILURE);
     }
 
     // Optional symbols — missing is fine
-    vespercsi_plugin_function_init init = 
-        (vespercsi_plugin_function_init)dlsym(handle, "vespercsi_plugin_init");
-    dlerror(); // clear error whether found or not
+    vespercsi_plugin_function_init_t init = (vespercsi_plugin_function_init_t)dlsym(handle, "vespercsi_plugin_function_init");
+    
+    err = dlerror();
+    if (err) {
+        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_init: %s", err);
+        dlclose(handle);
+        exit(EXIT_FAILURE);
+    }
 
-    vespercsi_plugin_function_destroy destroy = 
-        (vespercsi_plugin_function_destroy)dlsym(handle, "vespercsi_plugin_destroy");
-    dlerror();
+    vespercsi_plugin_function_destroy_t destroy = (vespercsi_plugin_function_destroy_t)dlsym(handle, "vespercsi_plugin_function_destroy");
+    
+    err = dlerror();
+    if (err) {
+        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_destroy: %s", err);
+        dlclose(handle);
+        exit(EXIT_FAILURE);
+    }
 
     vespercsi_plugin.handle  = handle;
     vespercsi_plugin.callback = callback;
@@ -46,8 +55,14 @@ void vespercsi_plugin_load(void){
     vespercsi_plugin.loaded  = true;
 
     // Call init if the plugin provided one
-    if (vespercsi_plugin.init) {
-        vespercsi_plugin.init();
+    if (vespercsi_plugin.init){
+        vespercsi_plugin_context_t new_context = {
+            .sdk_version = VESPERCSI_PLUGIN_SDK_VERSION,
+            .log.function = vespercsi_log,
+            .log.verbose = vespercsi_options.verbose
+        };
+
+        vespercsi_plugin.init(&new_context);
     }
 
     return;

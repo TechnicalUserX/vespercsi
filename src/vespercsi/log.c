@@ -9,21 +9,22 @@
 
 FILE* vespercsi_log_file = NULL;
 
+void vespercsi_log_init(void) {
+    if (vespercsi_options.log_file_set) {
+        vespercsi_log_file = fopen(vespercsi_options.log_file_path, "a");
+        if (!vespercsi_log_file) {
+            fprintf(stderr, "VesperCSI: Logger could not open file at %s\n",
+                    vespercsi_options.log_file_path);
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
 void vespercsi_log(vespercsi_log_level_t log_level, const char* format, ...) {
     va_list vl;
     char log_buffer[1024] = {0};
     char variable_buffer[512] = {0};
     
-
-    // Handle lazy initialization (Note: Still not entirely thread-safe without a mutex!)
-    if (vespercsi_options.log_file_set && vespercsi_log_file == NULL) {
-        vespercsi_log_file = fopen(vespercsi_options.log_file_path, "a");
-        if (vespercsi_log_file == NULL) {
-            fprintf(stdout, "VesperCSI: Logger could not open file at %s\n", vespercsi_options.log_file_path);
-            exit(EXIT_FAILURE);
-        }
-    }
-
     // Safely format the user's string
     va_start(vl, format);
     vsnprintf(variable_buffer, sizeof(variable_buffer), format, vl);
