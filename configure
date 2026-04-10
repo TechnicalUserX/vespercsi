@@ -554,6 +554,7 @@ function config_builddir_create(){
         mkdir -p "${BUILD_BIN_DIR}"
         mkdir -p "${BUILD_DOC_DIR}"
         mkdir -p "${BUILD_PKG_DIR}"
+        mkdir -p "${BUILD_HDR_DIR}"
     fi
 
     return
@@ -581,6 +582,7 @@ function config_builddir_clean(){
     rm -rf "${BUILD_LIB_DIR:?}/*"
     rm -rf "${BUILD_DOC_DIR:?}/*"
     rm -rf "${BUILD_PKG_DIR:?}/*"
+    rm -rf "${BUILD_HDR_DIR:?}/*"
 
 
     # Clean all symbolic links
@@ -695,17 +697,6 @@ if ! test "$ROOT_DIR" = "$PWD"; then
 fi
 
 ########################################
-# Default Compiler, Preprocessor, 
-# and Linker Flags (MODIFY HERE)
-
-CC="/home/tux/VesperCSI/vesperos/output/host/bin/aarch64-buildroot-linux-gnu-gcc"
-CXX="g++"
-CFLAGS="-Werror --sysroot=\"/home/tux/VesperCSI/vesperos/output/host/aarch64-buildroot-linux-gnu/sysroot\" -Wall -I\"${ROOT_DIR}/src\" -I\"${ROOT_DIR}/lib\" -I/home/tux/VesperCSI/vesperos/output/host/aarch64-buildroot-linux-gnu/sysroot/usr/include/libnl3"
-CPPFLAGS=""
-CXXFLAGS=""
-LDFLAGS="-lnl-genl-3 -lnl-3 -lm -lconfig" 
-
-########################################
 # Directories (MODIFY HERE)
 
 BUILD_DIR="${ROOT_DIR}/build"
@@ -714,6 +705,18 @@ BUILD_BIN_DIR="${BUILD_DIR}/bin"
 BUILD_LIB_DIR="${BUILD_DIR}/lib"
 BUILD_DOC_DIR="${BUILD_DIR}/docs"
 BUILD_PKG_DIR="${BUILD_DIR}/pkg"
+BUILD_HDR_DIR="${BUILD_DIR}/include"
+
+########################################
+# Default Compiler, Preprocessor, 
+# and Linker Flags (MODIFY HERE)
+
+CC="gcc"
+CXX="g++"
+CFLAGS="-Werror -Wall -I\"${ROOT_DIR}/src\" -I\"${ROOT_DIR}/lib\" -I\"${BUILD_HDR_DIR}\" -I/usr/include/libnl3"
+CPPFLAGS=""
+CXXFLAGS=""
+LDFLAGS="-lnl-genl-3 -lnl-3 -lm -lconfig" 
 
 ########################################
 # Build Directory Marker
@@ -897,6 +900,13 @@ for target in ${TARGETS}; do
      case "$target" in
 
         vespercsi)
+
+            if config_build_in "src/templates/version.h.in" "${BUILD_HDR_DIR}/vespercsi/version.h"; then
+                config_log PASS "version.h"
+            else
+                config_log FAIL "version.h"
+            fi
+
             if config_sources "$target" "src"; then
                 config_log PASS "${PROJECT} sources"
             else

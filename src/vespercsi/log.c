@@ -1,3 +1,4 @@
+#include "vespercsi/vespercsi.h"
 #include <vespercsi/options.h>
 #include <vespercsi/log.h>
 
@@ -15,10 +16,18 @@ void vespercsi_log_init(void) {
         if (!vespercsi_log_file) {
             fprintf(stderr, "VesperCSI: Logger could not open file at %s\n",
                     vespercsi_options.log_file_path);
-            exit(EXIT_FAILURE);
+             exit(EXIT_FAILURE);
         }
     }
+    return;
 }
+
+void vespercsi_log_destroy(void){
+    if(vespercsi_options.log_file_set){
+        fclose(vespercsi_log_file);
+    }
+}
+
 
 void vespercsi_log(vespercsi_log_level_t log_level, const char* format, ...) {
     va_list vl;
@@ -58,3 +67,4 @@ void vespercsi_log(vespercsi_log_level_t log_level, const char* format, ...) {
         fflush(stdout);        
     }
 }
+

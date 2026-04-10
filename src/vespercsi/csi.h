@@ -28,7 +28,7 @@
 #include <stdatomic.h>
 #include <time.h>
 #include <string.h>
-
+#include <sys/uio.h>
 
 #define VESPERCSI_CSI_SUPPORTED_TX_MAX 2
 #define VESPERCSI_CSI_SUPPORTED_RX_MAX 2
@@ -47,6 +47,9 @@
 #define VESPERCSI_CSI_DATA_SIZE_MAX VESPERCSI_CSI_DATA_BYTE_SIZE(VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX, VESPERCSI_CSI_SUPPORTED_TX_MAX, VESPERCSI_CSI_SUPPORTED_RX_MAX)
 
 #define VESPERCSI_CSI_SIZE_MAX (VESPERCSI_CSI_HEADER_LENGTH + VESPERCSI_CSI_DATA_SIZE_MAX)
+
+#define VESPERCSI_CSI_BATCH_FLUSH_SIZE 50
+#define VESPERCSI_CSI_BATCH_FLUSH_INTERVAL 50000
 
 #define IWL_MVM_VENDOR_ATTR_CSI_HDR 0x4d
 #define IWL_MVM_VENDOR_ATTR_CSI_DATA 0x4e
@@ -104,11 +107,15 @@ extern vespercsi_csi_controller_t vespercsi_csi_controller;
 
 void vespercsi_csi_controller_init(vespercsi_csi_controller_t* controller);
 
+void vespercsi_csi_controller_destroy(vespercsi_csi_controller_t* controller);
+
 void vespercsi_csi_capture_start(void);
+
+void vespercsi_csi_capture_stop(void);
 
 void vespercsi_csi_consume_start(void);
 
-void vespercsi_csi_ringbuffer_swap_handler(void);
+void vespercsi_csi_consume_stop(void);
 
 void vespercsi_csi_runner_set_realtime_priority(int priority);
 
@@ -125,6 +132,8 @@ int vespercsi_csi_listen_handler(struct vespercsi_netlink_t *state, struct nl_ms
 int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg);
 
 int vespercsi_csi_fix_bugs(vespercsi_csi_metadata_t* metadata, vespercsi_csi_data_t* data);
+
+void vespercsi_csi_close_file(void);
 
 static inline uint64_t vespercsi_csi_wallclock_us(void) {
     struct timespec ts;

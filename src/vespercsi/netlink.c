@@ -1,3 +1,4 @@
+#include <vespercsi/signal.h>
 #include <vespercsi/netlink.h>
 #include <vespercsi/log.h>
 
@@ -9,6 +10,7 @@ int vespercsi_netlink_init(vespercsi_netlink_t* netlink){
         LOG(FAIL, "Cannot allocate a netlink socket");
         return VESPERCSI_FAIL;
     }
+    netlink->netlink_socket_fd = nl_socket_get_fd(netlink->netlink_socket);
 
     if(genl_connect(netlink->netlink_socket)){
         LOG(FAIL, "Cannot connect to netlink socket");
@@ -86,6 +88,9 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
     err = nl_send_auto_complete(netlink->netlink_socket, msg);
 
     if(err < 0){
+        nl_cb_put(cb);
+        nl_cb_put(s_cb);
+        nlmsg_free(msg);
         return VESPERCSI_FAIL;
     }
 
@@ -96,15 +101,38 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
     nl_cb_set(cb, NL_CB_ACK, NL_CB_CUSTOM, vespercsi_netlink_ack_handler, &err);
     nl_cb_set(cb, NL_CB_MSG_IN, NL_CB_CUSTOM, command->valid_handler ? command->valid_handler : vespercsi_netlink_nlvalid_handler, command->args);
     
+    struct pollfd fds[2] = {
+        { .fd = netlink->netlink_socket_fd, .events = POLLIN },
+        { .fd = vespercsi_signal_shutdown_pipe[0], .events = POLLIN },
+    };
+
     while(err > 0){
-        nl_recvmsgs(netlink->netlink_socket, cb);
+
+        int ret = poll(fds, 2, -1);
+
+        if (ret < 0) {
+            if (errno == EINTR) continue;  // signal interrupted poll, loop again
+            break;                          // real error
+        }
+
+        if (fds[1].revents & POLLIN){
+            break;  // shutdown signaled
+        }
+
+        if (fds[0].revents & POLLIN){
+            int recv_err = nl_recvmsgs(netlink->netlink_socket, cb);
+            if (recv_err < 0) {
+                err = recv_err; // Break the loop and report the error
+            }
+        }
+
     }
 
     nl_cb_put(cb);
     nl_cb_put(s_cb);
     nlmsg_free(msg);        
 
-    if(err == 0){
+    if(err == 0 || vespercsi_signal_shutdown_flag){
         return VESPERCSI_OK;
     }
 
@@ -127,15 +155,14 @@ int vespercsi_netlink_error_handler(struct sockaddr_nl *nla, struct nlmsgerr *er
     int *ret = (int *)arg;
     int ack_len = sizeof(*nlh) + sizeof(int) + sizeof(*nlh);
     
-    if (err->error > 0)
-    {
+    if(err->error > 0){
         /*
          * This is illegal, per netlink(7), but not impossible (think
          * "vendor commands"). Callers really expect negative error
          * codes, so make that happen.
          */
 
-        exit(EXIT_FAILURE);
+        raise(SIGINT);
         // throw std::ios_base::failure("ERROR: received positive netlink error code " + std::to_string(err->error) + "\n");
         //*ret = -EPROTO;
     }
@@ -162,15 +189,11 @@ int vespercsi_netlink_error_handler(struct sockaddr_nl *nla, struct nlmsgerr *er
 
     
     nla_parse(tb, NLMSGERR_ATTR_MAX, attrs, len, NULL);
-    if (tb[NLMSGERR_ATTR_MSG])
-    {
+    if(tb[NLMSGERR_ATTR_MSG]){
         LOG(FAIL, "Kernel says: %s", (char *)nla_data(tb[NLMSGERR_ATTR_MSG]));
-        len = strnlen((char *)nla_data(tb[NLMSGERR_ATTR_MSG]),
-                      nla_len(tb[NLMSGERR_ATTR_MSG]));
-        exit(EXIT_FAILURE);
+        len = strnlen((char *)nla_data(tb[NLMSGERR_ATTR_MSG]), nla_len(tb[NLMSGERR_ATTR_MSG]));
+        raise(SIGINT);
         //throw std::ios_base::failure("kernel reports: " + std::string((char *)nla_data(tb[NLMSGERR_ATTR_MSG])) + "\n");
-    }else{
-        printf("no?\n");
     }
 
     return NL_STOP;
@@ -186,4 +209,14 @@ int vespercsi_netlink_ack_handler(struct nl_msg *msg, void *arg){
     int *ret = (int *)arg;
     *ret = 0;
     return NL_STOP;
+}
+
+int vespercsi_netlink_destroy(vespercsi_netlink_t* netlink){
+    if(!netlink){
+        return VESPERCSI_FAIL;
+    }
+    
+    nl_socket_free(netlink->netlink_socket);
+
+    return VESPERCSI_OK;
 }

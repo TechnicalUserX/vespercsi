@@ -1,0 +1,27 @@
+\mainpage VesperCSI
+
+**Welcome to the VesperCSI documentation!**
+
+VesperCSI is designed to work efficiently and faster on Embedded Linux platforms. It is a derivative work of FeitCSI. <br> 
+Checkout FeitCSI: https://feitcsi.kuskosoft.com/
+
+---
+
+**Documentation**
+
+- \subpage users
+
+- \subpage developers
+
+- \subpage internals
+
+---
+
+**Special Thanks**
+
+- Yiğit Can Çelik
+- Mustafa Emre Çiftçi
+
+---
+
+*This project is developed under the Middle East Technical Unversity*

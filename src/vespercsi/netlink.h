@@ -20,6 +20,7 @@
 
 typedef struct vespercsi_netlink_t{
     struct nl_sock*  netlink_socket;
+    int netlink_socket_fd;
     int              nl80211_id;
 }vespercsi_netlink_t;
 
@@ -42,6 +43,8 @@ typedef struct vespercsi_netlink_command_t{
 }vespercsi_netlink_command_t;
 
 int vespercsi_netlink_init(vespercsi_netlink_t* netlink);
+
+int vespercsi_netlink_destroy(vespercsi_netlink_t* netlink);
 
 int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_command_t* command);
 

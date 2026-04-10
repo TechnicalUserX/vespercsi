@@ -2,6 +2,7 @@
 #define VESPERCSI_OPTIONS_H
 
 #include <vespercsi/vespercsi.h>
+#include <vespercsi/version.h>
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,12 +18,12 @@ typedef struct vespercsi_options_t{
     uint8_t mcs;
     uint16_t channel_width;
     uint8_t spatial_streams;
-    uint8_t tx_power;
     uint32_t antenna;
     char format[16];
 
     // Prints More Information
     bool verbose;
+    uint8_t verbosity;
 
     bool interface_mac_set;
     uint8_t interface_mac[ETH_ALEN];
@@ -44,6 +45,10 @@ typedef struct vespercsi_options_t{
     // Configuration File for Extra Functionality
     bool config_file_set;
     char config_file_path[512];
+
+    bool unrestricted;
+
+    bool daemon;
 }vespercsi_options_t;
 
 extern vespercsi_options_t vespercsi_options;

@@ -1,30 +1,39 @@
-#include "vespercsi/csi.h"
+#include "vespercsi/vespercsi.h"
+#include <vespercsi/csi.h>
 #include <vespercsi/signal.h>
 #include <vespercsi/log.h>
 #include <vespercsi/plugin.h>
 
+int vespercsi_signal_shutdown_pipe[2] = {0};
+
+volatile sig_atomic_t vespercsi_signal_shutdown_flag = false;
+
 void vespercsi_signal_init(void){
 
     struct sigaction sa = {
-        .sa_flags = SA_RESTART,
         .sa_handler = vespercsi_signal_sigint_handler
     };
 
-    sigaction(SIGINT, &sa, NULL);
+    if(sigaction(SIGINT, &sa, NULL) != 0){
+        exit(EXIT_FAILURE);
+    }
+
+    if(pipe(vespercsi_signal_shutdown_pipe) != 0){
+        exit(EXIT_FAILURE);
+    }
+
+    return;
 }
 
 
+void vespercsi_signal_destroy(void){
+    close(vespercsi_signal_shutdown_pipe[0]);
+    close(vespercsi_signal_shutdown_pipe[1]);
+}
+
 void vespercsi_signal_sigint_handler(int s){
-
-    if(vespercsi_log_file){
-        fclose(vespercsi_log_file);
+    if (vespercsi_signal_shutdown_flag == false) {
+        vespercsi_signal_shutdown_flag = true;
+        write(vespercsi_signal_shutdown_pipe[1], "\x00", 1);
     }
-
-    if(vespercsi_options.out_file_set){
-        close(vespercsi_csi_controller.vespercsi_csi_out_file);
-    }
-
-    vespercsi_plugin_unload();
-
-    exit(EXIT_SUCCESS);
 }

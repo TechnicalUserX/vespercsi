@@ -9,9 +9,7 @@
 // 
 // To create a plugin:
 // 1. Include this header
-// 2. Implement vespercsi_plugin_consume() — required
-// 3. Optionally implement vespercsi_plugin_init() and
-//    vespercsi_plugin_destroy()
+// 2. Implement vespercsi_plugin_callback(), vespercsi_plugin_init() and vespercsi_plugin_destroy()
 // 4. Compile as a shared library:
 //    gcc -shared -fPIC -o my_plugin.so my_plugin.c
 // ================================================================
@@ -77,6 +75,8 @@ typedef struct vespercsi_csi_t {
 #define VESPERCSI_RATE_MCS_CHAN_WIDTH_80     (2 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
 #define VESPERCSI_RATE_MCS_CHAN_WIDTH_160    (3 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
 
+
+
 // ================================================================
 // Plugin Internals
 // ================================================================
@@ -100,6 +100,7 @@ typedef void (*vespercsi_plugin_function_log_t)(vespercsi_log_level_t level, con
 typedef struct vespercsi_plugin_log_t{
     vespercsi_plugin_function_log_t function;
     bool verbose;
+    uint8_t verbosity;
 }vespercsi_plugin_log_t;
 
 typedef struct vespercsi_plugin_context_t{
@@ -111,7 +112,7 @@ extern vespercsi_plugin_context_t vespercsi_plugin_context;
 
 #define LOG(level, format, ...) {vespercsi_plugin_context.log.function(level, format, ##__VA_ARGS__);}
 
-#define LOG_VERBOSE(level, format, ...) if(vespercsi_plugin_context.log.verbose){vespercsi_plugin_context->log.function(level, format, ##__VA_ARGS__);}
+#define LOG_VERBOSE(verbosity_index, level, format, ...) if(vespercsi_plugin_context.log.verbose && verbosity_index <= vespercsi_plugin_context.log.verbosity ){vespercsi_plugin_context.log.function(level, format, ##__VA_ARGS__);}
 
 // ================================================================
 // Plugin API — symbols your shared library must/can export

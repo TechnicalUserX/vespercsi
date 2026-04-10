@@ -1,3 +1,5 @@
+#include <vespercsi/netlink.h>
+#include <vespercsi/signal.h>
 #include <vespercsi/options.h>
 #include <vespercsi/csi.h>
 #include <vespercsi/log.h>
@@ -38,9 +40,21 @@ void vespercsi_csi_controller_init(vespercsi_csi_controller_t* controller){
     }
 }
 
+void vespercsi_csi_controller_destroy(vespercsi_csi_controller_t* controller){
+    if(!controller){
+        return;
+    }
+    vespercsi_netlink_destroy(&controller->netlink);
+}
+
 void vespercsi_csi_capture_start(void){
     LOG(INFO, "Capture Runner started");
     pthread_create(&vespercsi_csi_controller.runner_capture_thread, NULL, vespercsi_csi_capture_runner, NULL);
+}
+
+void vespercsi_csi_capture_stop(void){
+    LOG(INFO, "Capture Runner stopping");
+    pthread_join(vespercsi_csi_controller.runner_capture_thread, NULL);
 }
 
 void vespercsi_csi_consume_start(void){
@@ -48,7 +62,12 @@ void vespercsi_csi_consume_start(void){
     pthread_create(&vespercsi_csi_controller.runner_consume_thread, NULL, vespercsi_csi_consume_runner, NULL);
 }
 
-void vespercsi_csi_ringbuffer_swap_handler(void){
+void vespercsi_csi_consume_stop(void){
+    LOG(INFO, "Consume Runner stopping");
+    pthread_join(vespercsi_csi_controller.runner_consume_thread, NULL);
+}
+
+static inline void vespercsi_csi_ringbuffer_swap_handler(void){
     vespercsi_csi_ringbuffer_listpool_t* temp = vespercsi_csi_ringbuffer_capture;
     vespercsi_csi_ringbuffer_capture = vespercsi_csi_ringbuffer_consume;
     vespercsi_csi_ringbuffer_consume = temp;
@@ -79,14 +98,14 @@ void* vespercsi_csi_capture_runner(void* arg){
 
     if(vespercsi_config.runners.capture.priority_set){
         if(vespercsi_config.runners.capture.core_set == false){
-            LOG_VERBOSE(WARN, "Core not set for consume runner, potential system instability");
+            LOG_VERBOSE(VERBOSITY_0, WARN, "Capture: Core not set for capture runner, potential system instability");
         }        
         vespercsi_csi_runner_set_realtime_priority(vespercsi_config.runners.capture.priority);
     }
 
     vespercsi_csi_listen(&vespercsi_csi_controller);
 
-    return NULL;
+    pthread_exit(NULL);
 }
 
 void* vespercsi_csi_consume_runner(void* arg){
@@ -97,41 +116,48 @@ void* vespercsi_csi_consume_runner(void* arg){
 
     if(vespercsi_config.runners.consume.priority_set){
         if(vespercsi_config.runners.consume.core_set == false){
-            LOG_VERBOSE(WARN, "Core not set for consume runner, potential system instability");
+            LOG_VERBOSE(VERBOSITY_0, WARN, "Consume: Core not set for consume runner, potential system instability");
         }
         vespercsi_csi_runner_set_realtime_priority(vespercsi_config.runners.consume.priority);
     }
 
     static uint64_t counter = 0;
 
-    while(1){
+    while(!vespercsi_signal_shutdown_flag){
         vespercsi_csi_t csi = {0};
         
         vespercsi_csi_ringbuffer_listpool_status_t status = vespercsi_csi_ringbuffer_listpool_pop_back(vespercsi_csi_ringbuffer_consume, &csi);
 
         if(status == VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_SUCCESS){
-            counter++;
+    
+            if(vespercsi_options.verbose){
+                counter++;
+            }
+    
             // Process your CSI packet instantly
-            LOG_VERBOSE(DEBG, "Consume CSI %lu", counter);
+            LOG_VERBOSE(VERBOSITY_2, DEBG, "Consume: CSI Popped %lu", counter);
             
             // Plugin Callback
-            if(vespercsi_plugin.loaded){
+            if(vespercsi_plugin.loaded && vespercsi_plugin.callback){
                 vespercsi_plugin.callback(&csi);
             }
 
             if(vespercsi_options.out_file_set){
-                uint8_t io_write_buffer[VESPERCSI_CSI_SIZE_MAX] = {0};
 
-                memcpy(io_write_buffer, &csi.header, VESPERCSI_CSI_HEADER_LENGTH);
-                memcpy(io_write_buffer + VESPERCSI_CSI_HEADER_LENGTH, csi.data.csi_data, csi.header.csi_data_size);
+                struct iovec iov[2];
+                iov[0].iov_base = &csi.header;
+                iov[0].iov_len  = VESPERCSI_CSI_HEADER_LENGTH;
+                iov[1].iov_base = csi.data.csi_data;
+                iov[1].iov_len  = csi.header.csi_data_size;
 
-                size_t io_write_size = VESPERCSI_CSI_HEADER_LENGTH + csi.header.csi_data_size;
-                ssize_t s = write(vespercsi_csi_controller.vespercsi_csi_out_file, io_write_buffer, io_write_size);                
+                size_t io_write_size = iov[0].iov_len + iov[1].iov_len;
+
+                ssize_t s = writev(vespercsi_csi_controller.vespercsi_csi_out_file, iov, 2);
 
                 if(s == VESPERCSI_CSI_HEADER_LENGTH + csi.header.csi_data_size){
-                    LOG_VERBOSE(INFO,"CSI with size %ld written to file %s", io_write_size, vespercsi_options.out_file_path);
+                    LOG_VERBOSE(VERBOSITY_2, INFO,"Consume: CSI with size %ld written to file %s", io_write_size, vespercsi_options.out_file_path);
                 }else{
-                    LOG_VERBOSE(WARN, "CSI with size %ld data not written: %s", io_write_size, strerror(errno));
+                    LOG_VERBOSE(VERBOSITY_2, WARN, "Consume: CSI with size %ld data not written: %s", io_write_size, strerror(errno));
                 }
             }
 
@@ -151,11 +177,18 @@ void* vespercsi_csi_consume_runner(void* arg){
             
             }else{
                 // STILL TRULY EMPTY. Flag is 0.
-                __asm__ __volatile__("yield" ::: "memory");
+                #if defined(__aarch64__) || defined(__arm__)
+                    __asm__ __volatile__("yield" ::: "memory");
+                #elif defined(__x86_64__) || defined(__i386__)
+                    __builtin_ia32_pause(); // or __asm__ __volatile__("pause" ::: "memory");
+                #else
+                    sched_yield();
+                #endif
             }
         }
     }
-    return NULL;
+
+    pthread_exit(NULL);
 }
 
 int vespercsi_csi_listen(vespercsi_csi_controller_t* controller){
@@ -180,6 +213,10 @@ nla_put_failure:
 }
 
 int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
+
+    // static uint64_t last_flush_time = 0;
+    // uint64_t current_time = vespercsi_csi_wallclock_us();
+    // bool should_signal_swap = false;
 
     static uint64_t counter = 0;
 
@@ -211,6 +248,11 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
 
             unsigned int data_length = nla_len(attrs[IWL_MVM_VENDOR_ATTR_CSI_DATA]);
 
+            if (data_length > VESPERCSI_CSI_DATA_SIZE_MAX) {
+                LOG_VERBOSE(VERBOSITY_0, WARN, "Capture: Received CSI payload too large: %u bytes", data_length);
+                return NL_SKIP;
+            }
+
             uint8_t* data = (uint8_t *)nla_data(attrs[IWL_MVM_VENDOR_ATTR_CSI_DATA]);
             
             memcpy(current_csi_data.csi_data, data, data_length);
@@ -225,14 +267,14 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
                 return NL_SKIP;
             }
 
-            if(
+            if( (vespercsi_options.unrestricted) || 
                 (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_20 && vespercsi_options.channel_width == 20) ||
-                (current_csi_metadata.channel_width== RATE_MCS_CHAN_WIDTH_40 && vespercsi_options.channel_width == 40) ||
+                (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_40 && vespercsi_options.channel_width == 40) ||
                 (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_80 && vespercsi_options.channel_width == 80) ||
-                (current_csi_metadata.channel_width== RATE_MCS_CHAN_WIDTH_160 && vespercsi_options.channel_width == 160)
+                (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_160 && vespercsi_options.channel_width == 160)
             
             ){
-                if(
+                if( (vespercsi_options.unrestricted) || 
                     (current_csi_metadata.format == RATE_MCS_LEGACY_OFDM_MSK && strcmp(vespercsi_options.format ,"NOHT") == 0) ||
                     (current_csi_metadata.format == RATE_MCS_HT_MSK && strcmp(vespercsi_options.format ,"HT") == 0) ||
                     (current_csi_metadata.format == RATE_MCS_VHT_MSK && strcmp(vespercsi_options.format ,"VHT") == 0) ||
@@ -240,7 +282,9 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
                     (current_csi_metadata.format == RATE_MCS_EHT_MSK && strcmp(vespercsi_options.format ,"EHT") == 0)
                 ){
                     // CSI Captured
-                    counter++;
+                    if(vespercsi_options.verbose){
+                        counter++;
+                    }
 
                     current_csi_metadata.header.timestamp = vespercsi_csi_wallclock_us();
 
@@ -250,34 +294,39 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
                     };
 
                     while (atomic_flag_test_and_set_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_acquire));
+                    if(vespercsi_csi_ringbuffer_capture->free_memory == NULL){
+                        vespercsi_csi_ringbuffer_listpool_remove(vespercsi_csi_ringbuffer_capture, vespercsi_csi_ringbuffer_capture->back);
+                    }
+                    
+                    // if (vespercsi_csi_ringbuffer_capture->size >= VESPERCSI_CSI_BATCH_FLUSH_SIZE || (current_time - last_flush_time) >= VESPERCSI_CSI_BATCH_FLUSH_INTERVAL) {
+                    //     should_signal_swap = true;
+                    //     last_flush_time = current_time;
+                    // }
+
                     vespercsi_csi_ringbuffer_listpool_status_t status = vespercsi_csi_ringbuffer_listpool_push_front(vespercsi_csi_ringbuffer_capture, &csi);
                     atomic_flag_clear_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_release);
 
                     switch(status){
                         case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_SUCCESS:{
-                            LOG_VERBOSE(DEBG, "Pushed CSI %lu", counter);
+                            LOG_VERBOSE(VERBOSITY_2, DEBG, "Capture: Pushed CSI %lu", counter);
                         }break;
 
                         case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NO_MEMORY:{
-                            LOG_VERBOSE(DEBG, "No memory to push CSI");
+                            LOG_VERBOSE(VERBOSITY_0, WARN, "Capture: No memory to push CSI in listpool ring buffer");
                         }break;
 
                         case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NULL_VALUE:{
-                            LOG_VERBOSE(DEBG, "Null value whiile pushing CSI");
+                            LOG_VERBOSE(VERBOSITY_0, WARN, "Capture: Null value while pushing CSI");
                         }break;
-
-                        case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_EMPTY:{
-                            LOG_VERBOSE(DEBG, "Empty buffer?");
-                        }break;                        
-                        
+                     
+                 
                         default:break;
                     }
 
-                    char mac_string[18] = {0};
-                    vespercsi_wifi_mac_string(mac_string, current_csi_metadata.header.src_mac);
+                    //if (should_signal_swap) {
+                        atomic_store_explicit(&vespercsi_capture_dirty_flag, 1, memory_order_release);
+                    //}
 
-                    atomic_store_explicit(&vespercsi_capture_dirty_flag, 1, memory_order_release);
-                    LOG_VERBOSE(INFO, "CSI Capture");
                 }
 
             }
@@ -296,6 +345,12 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
     }
     */
     return NL_SKIP;
+}
+
+void vespercsi_csi_close_file(void){
+    if(vespercsi_options.out_file_set){
+        close(vespercsi_csi_controller.vespercsi_csi_out_file);
+    }
 }
 
 int vespercsi_csi_fix_bugs(vespercsi_csi_metadata_t* metadata, vespercsi_csi_data_t* data){

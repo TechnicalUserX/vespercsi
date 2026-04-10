@@ -1,16 +1,17 @@
 #include <vespercsi/plugin.h>
 #include <vespercsi/config.h>
 
+
 vespercsi_plugin_t vespercsi_plugin = {0};
 
 void vespercsi_plugin_load(void){
-    if(vespercsi_config.plugin.path_set == false){
+    if(vespercsi_plugin.set == false){
         return;
     }
 
     // RTLD_NOW  — resolve all symbols immediately, fail fast if missing
     // RTLD_LOCAL — don't pollute global symbol namespace
-    void* handle = dlopen(vespercsi_config.plugin.path, RTLD_NOW | RTLD_LOCAL);
+    void* handle = dlopen(vespercsi_plugin.path, RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
         fprintf(stdout, "VesperCSI: Plugin load failed: %s", dlerror());
         exit(EXIT_FAILURE);
@@ -59,12 +60,14 @@ void vespercsi_plugin_load(void){
         vespercsi_plugin_context_t new_context = {
             .sdk_version = VESPERCSI_PLUGIN_SDK_VERSION,
             .log.function = vespercsi_log,
-            .log.verbose = vespercsi_options.verbose
+            .log.verbose = vespercsi_options.verbose,
+            .log.verbosity = vespercsi_options.verbosity
         };
 
         vespercsi_plugin.init(&new_context);
     }
 
+    vespercsi_plugin.loaded = true;
     return;
 }
 

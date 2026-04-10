@@ -15,6 +15,7 @@ typedef void (*vespercsi_plugin_function_log_t)(vespercsi_log_level_t level, con
 typedef struct vespercsi_plugin_log_t{
     vespercsi_plugin_function_log_t function;
     bool verbose;
+    uint8_t verbosity;
 }vespercsi_plugin_log_t;
 
 typedef struct vespercsi_plugin_context_t{
@@ -29,6 +30,8 @@ typedef void (*vespercsi_plugin_function_init_t)(vespercsi_plugin_context_t* con
 typedef void (*vespercsi_plugin_function_destroy_t)(void);
 
 typedef struct vespercsi_plugin_t {
+    bool set;
+    char path[512];
     void*                                   handle;      // dlopen handle
     vespercsi_plugin_function_callback_t    callback;
     vespercsi_plugin_function_init_t        init;

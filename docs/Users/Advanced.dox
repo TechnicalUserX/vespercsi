@@ -1,0 +1,46 @@
+\page advanced Advanced
+
+Edge-Device signal processing necessitates efficient management of resources. The big data nature of CSI processing forces
+ones to think not only in the user-space, but also in the hardware level. In achieving seamless processing, utilization of
+the underlying hardware platform plays an important role. To make this possible, VesperCSI is equipped with kernel-level
+configurability.
+
+
+---
+
+
+
+## Brief Introduction to Internals
+
+- VesperCSI contains two main threads (called `runners` in general) other than the main thread. These are called `capture` and `consume`.
+- `capture` thread (runner) takes the CSI data from Netlink buffer and append it to the internal ring buffer.
+- `consume` thread (runner) processes the CSI data as desired, including but not limited to writing the data to a file.
+- VesperCSI allows one to configure these threads to run according to defined rules.
+
+
+---
+
+## Thread Affinity & Priorities
+
+**Thread Affinity**
+
+- Each runner can be configured to run inside a specific CPU core, decreasing the time it takes the system to decide which core to run the `runner` on.
+
+**Priority**
+
+- With the help of a Real-Time Linux Kernel, a priority number can be set to prevent any other process from running inside that CPU core.
+
+> If you are not sure whether you successfully prevented every user-space process and kernel threads from running inside 
+> the cores that `runners` use (`CPU Core isloation`), do not use this feature.
+
+
+---
+
+## Example Configuration File
+
+- Below is an example `vespercsi.conf` file that sets up thread affinity and priorities:
+
+\include config/runners.conf
+
+---
+

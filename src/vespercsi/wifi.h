@@ -66,6 +66,8 @@ extern vespercsi_wifi_controller_t vespercsi_wifi_controller;
 
 void vespercsi_wifi_controller_init(vespercsi_wifi_controller_t* controller);
 
+void vespercsi_wifi_controller_destroy(vespercsi_wifi_controller_t* controller);
+
 void vespercsi_wifi_get_phys(vespercsi_wifi_controller_t* controller);
 
 void vespercsi_wifi_get_single_interface(vespercsi_wifi_controller_t* controller, vespercsi_wifi_interface_t* interface, const char *ifname);
@@ -91,8 +93,6 @@ int vespercsi_wifi_get_single_interface_handler(struct nl_msg *msg, void *arg);
 int vespercsi_wifi_set_interface_frequency_handler(vespercsi_netlink_t *netlink, struct nl_msg *msg, void *arg);
 
 int vespercsi_wifi_get_phys_handler(struct nl_msg *msg, void *arg);
-
-int vespercsi_wifi_set_tx_power_handler(vespercsi_netlink_t *state, struct nl_msg *msg, void *arg);
 
 int vespercsi_wifi_add_device_handler(vespercsi_netlink_t *state, struct nl_msg *msg, void *arg);
 

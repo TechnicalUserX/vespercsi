@@ -16,6 +16,15 @@ void vespercsi_wifi_controller_init(vespercsi_wifi_controller_t* controller){
     
 }
 
+void vespercsi_wifi_controller_destroy(vespercsi_wifi_controller_t* controller){
+    if(!controller){
+        return;
+    }
+
+    vespercsi_netlink_destroy(&controller->netlink);
+
+}
+
 void vespercsi_wifi_get_phys(vespercsi_wifi_controller_t* controller){
     vespercsi_netlink_command_t command = {
         .id = NL80211_CMD_GET_WIPHY,
@@ -86,18 +95,6 @@ void vespercsi_wifi_set_interface_frequency(vespercsi_wifi_controller_t* control
     vespercsi_netlink_execute(&controller->netlink, &command);
 }
 
-void vespercsi_wifi_set_tx_power(vespercsi_wifi_controller_t* controller, const char* ifname){
-    
-    vespercsi_netlink_command_t command = {
-        .id = NL80211_CMD_SET_WIPHY,
-        .idby = VESPERCSI_NETLINK_CIB_NETDEV,
-        .nlFlags = 0,
-        .device = if_nametoindex(ifname),
-        .handler = vespercsi_wifi_set_tx_power_handler,
-    };
-
-    vespercsi_netlink_execute(&controller->netlink, &command);
-}
 
 int vespercsi_wifi_set_interface_updown(const char *ifname, bool up){
     // Create a socket file descriptor
@@ -138,8 +135,7 @@ int vespercsi_wifi_set_interface_updown(const char *ifname, bool up){
     // Close the socket
     close(sockfd);
 
-
-    LOG_VERBOSE(INFO, "Interface %s has been brought %s", ifname, (up ? "up" : "down"));
+    LOG_VERBOSE(VERBOSITY_0, INFO, "Interface %s has been brought %s", ifname, (up ? "up" : "down"));
 
     return 0;
 }
@@ -331,7 +327,7 @@ int vespercsi_wifi_set_interface_frequency_handler(vespercsi_netlink_t *state, s
     char *settingsWidth = (char *)(settings[1]);
 
 
-    LOG_VERBOSE(INFO, "Setting frequency %hu - Channel Width: %s", settingsFreq, settingsWidth);
+    LOG_VERBOSE(VERBOSITY_0, INFO, "Setting frequency %hu - Channel Width: %s", settingsFreq, settingsWidth);
 
     uint32_t freq = settingsFreq;
     uint32_t freq_offset = 0;
@@ -414,19 +410,6 @@ int vespercsi_wifi_get_phys_handler(struct nl_msg *msg, void *arg){
 
 
     return NL_OK;
-}
-
-int vespercsi_wifi_set_tx_power_handler(vespercsi_netlink_t *state, struct nl_msg *msg, void *arg){
-    enum nl80211_tx_power_setting type = NL80211_TX_POWER_FIXED;
-    int mbm = vespercsi_options.tx_power * 100; // dBm to mbm *100
-
-    NLA_PUT_U32(msg, NL80211_ATTR_WIPHY_TX_POWER_SETTING, type);
-    NLA_PUT_U32(msg, NL80211_ATTR_WIPHY_TX_POWER_LEVEL, mbm);
-
-    return 0;
-
-nla_put_failure:
-    return -ENOBUFS;
 }
 
 int vespercsi_wifi_add_device_handler(vespercsi_netlink_t *state, struct nl_msg *msg, void *arg){

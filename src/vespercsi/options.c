@@ -1,6 +1,7 @@
 #include <vespercsi/wifi.h>
 #include <vespercsi/options.h>
 #include <vespercsi/log.h>
+#include <vespercsi/plugin.h>
 
 
 // Global Options Struct
@@ -12,15 +13,16 @@ vespercsi_options_t vespercsi_options = {
     .format = "HT",
     .channel_width = 20,
     .verbose = false,
+    .verbosity = 0,
     .log_file_set = false,
     .log_file_path = "",
     .out_file_set = false,
     .out_file_path = "",
     .quiet = false,
     .bandwidth = "20",
-    .tx_power = 10,
     .src_mac_set = false,
-    .src_mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66}
+    .src_mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66},
+    .unrestricted = false
 
 };
 
@@ -32,21 +34,23 @@ void vespercsi_options_parse(int argc, char* argv[]){
         { "frequency",      required_argument,  NULL,   'f'},
         { "format",         required_argument,  NULL,   't'},
         { "channel-width",  required_argument,  NULL,   'w'},
-        { "tx-power",       required_argument,  NULL,   'p'},
-        { "verbose",        no_argument,        NULL,   'v'},
+        { "plugin",         required_argument,  NULL,   'p'},
+        { "verbose",        optional_argument,  NULL,   'v'},
         { "version",        no_argument,        NULL,   1000},
         { "log-file",       required_argument,  NULL,   'l'},
         { "out-file",       required_argument,  NULL,   'o'}, 
        { "quiet",          no_argument,        NULL,   'q'},
        { "src-mac",        required_argument,  NULL,   's'},
        { "config-file",    required_argument,  NULL,   'c'},
+       { "unrestricted",   no_argument,        NULL,   'u'},      
+       { "daemon",         no_argument,        NULL,   'd'},       
        { NULL,             0,                  NULL,   0  }   
     };
 
     optind = 0;
     int opt = 0;
     
-    while((opt = getopt_long(argc, argv, ":vhi:f:t:w:l:o:qu:p:s:c:",long_options,NULL)) != -1){
+    while((opt = getopt_long(argc, argv, ":vhi:f:t:w:l:o:qu:p:s:c:ud",long_options,NULL)) != -1){
 
         switch(opt){
     
@@ -59,6 +63,16 @@ void vespercsi_options_parse(int argc, char* argv[]){
             case 'v':{
                 vespercsi_options.verbose = true;
                 vespercsi_options.quiet = false;
+                
+                if(optarg){
+                    int verbosity = atoi(optarg);
+                    if(verbosity < 0 || verbosity > 2){
+                        printf( "VesperCSI: Verbose level not correct, possible values: 0,1,2\n");
+                        exit(EXIT_FAILURE);                    
+                    }
+                    vespercsi_options.verbosity = verbosity;
+                }
+
             }break;
 
             case 'q':{
@@ -66,20 +80,30 @@ void vespercsi_options_parse(int argc, char* argv[]){
                 vespercsi_options.quiet = true;
             }break;            
 
+            case 'u':{
+                vespercsi_options.unrestricted = true;
+            }break;     
+
             case 'l':{
                 vespercsi_options.log_file_set = true;
-                strncpy(vespercsi_options.log_file_path, optarg, 512-1);
+                strncpy(vespercsi_options.log_file_path, optarg, sizeof(vespercsi_options.log_file_path)-1);
             }break;
 
             case 'o':{
                 vespercsi_options.out_file_set = true;
-                strncpy(vespercsi_options.out_file_path, optarg, 512-1);
+                strncpy(vespercsi_options.out_file_path, optarg, sizeof(vespercsi_options.out_file_path)-1);
             }break;            
 
             case 'c':{
                 vespercsi_options.config_file_set = true;
-                strncpy(vespercsi_options.config_file_path, optarg, 512-1);
+                strncpy(vespercsi_options.config_file_path, optarg, sizeof(vespercsi_options.config_file_path)-1);
             }break;  
+
+            case 'd':{
+                // TODO: Implement in the future
+                // For now it is undocumented
+                vespercsi_options.daemon = true;
+            }break;
 
             case 'f':{
                 int f = atoi(optarg);
@@ -97,19 +121,15 @@ void vespercsi_options_parse(int argc, char* argv[]){
                     printf("VesperCSI: Bad bandwidth. Possible values of bandwidth are [20|40|HT40-|80|160]\n");
                     exit(EXIT_FAILURE);
                 }
-                strncpy(vespercsi_options.bandwidth, optarg, 127);
+                strncpy(vespercsi_options.bandwidth, optarg, sizeof(vespercsi_options.bandwidth)-1);
                 vespercsi_options.channel_width = vespercsi_wifi_channel_mode_to_width(&mode);
             }break;
 
             case 'p':{
-
-                int tx = atoi(optarg);
-                if (tx < 1 || tx > 22){
-                    printf("VesperCSI: Bad tx power. Possible values [1-22]\n");
-                    exit(EXIT_FAILURE);
+                if(!vespercsi_plugin.set){
+                    strncpy(vespercsi_plugin.path, optarg, sizeof(vespercsi_plugin.path)-1);
+                    vespercsi_plugin.set = true;
                 }
-                vespercsi_options.tx_power = (uint8_t)tx;
-
             }break;
 
             case 'i':{
@@ -163,6 +183,11 @@ void vespercsi_options_parse(int argc, char* argv[]){
             }
             break;
 
+            case 1000:{
+                // Version
+                printf("VesperCSI: Version: %s\n", VESPERCSI_VERSION);
+                exit(EXIT_SUCCESS);
+            }break;
         }
     
     }
@@ -178,25 +203,28 @@ void vespercsi_options_check_mandatory(){
     }
 }
 
-void vespercsi_options_print_usage(){
+void vespercsi_options_print_usage() {
     printf(
-        "Usage: %s [OPTIONS]\n\n"
+        "Usage: vespercsi [OPTIONS]\n\n"
         "VesperCSI - Wi-Fi Channel State Information Capture Tool\n\n"
         "Capture Settings:\n"
         "  -i, --interface-mac <mac>   [Required] MAC address of the capture interface\n"
         "  -f, --frequency <freq>      Center frequency in MHz (e.g., 2412, 5180)\n"
-        "  -w, --channel-width <width> Channel width in MHz (e.g., 20, 40, 80, 160)\n"
-        "  -t, --format <format>       CSI format (e.g., HT, VHT, HE)\n\n"
-        "Output & Networking:\n"
+        "  -w, --channel-width <width> Channel bandwidth [20|40|HT40-|80|160]\n"
+        "  -t, --format <format>       CSI format [NOHT|HT|VHT|HESU]\n\n"
+        "Filtering Options:\n"
+        "  -s, --src-mac <mac>         Filter incoming packets by source MAC address\n"
+        "  -u, --unrestricted          Do not restrict capture to matched channel width and format\n\n"
+        "Output & Plugins:\n"
         "  -o, --out-file <file>       Path to write raw CSI data\n"
-        "  -u, --udp <ip:port>         Stream CSI data over UDP\n\n"
+        "  -p, --plugin <path>         Path to load an external shared library plugin (.so)\n"
+        "  -c, --config-file <file>    Path to configuration file for extra functionality\n\n"
         "Logging & Output Control:\n"
         "  -l, --log-file <file>       Path to write application logs\n"
-        "  -v, --verbose               Enable verbose debug output\n"
+        "  -v, --verbose[=level]       Enable verbose debug output (levels: 0, 1, 2)\n"
         "  -q, --quiet                 Suppress all console output (overrides verbose)\n\n"
         "Miscellaneous:\n"
         "  -h, --help                  Show this help message and exit\n"
-        "      --version               Show program version and exit\n",
-        "vespercsi"
+        "      --version               Show program version and exit\n"
     );    
 }

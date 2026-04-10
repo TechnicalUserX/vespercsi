@@ -1,0 +1,133 @@
+\page basics Basics
+
+VesperCSI is a Channel State Information capture tool designed to work extremely fast to enable edge-device signal processing.
+The internals of FeitCSI are completely redesigned and written from scratch. While enhancing the already existing features, VesperCSI
+also allows anyone to extend the functionality of the tool with plugins.
+
+We will start with the most basic usage.
+
+---
+
+## Capturing CSI Traffic
+
+- The most basic usage of the VesperCSI is as follows:
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff
+```
+
+- The `-i` (or `--interface`) option specifies which interface to use for capturing CSI. This is the only obligatory command-line option.
+- Interface is specified with permanent MAC address of the interface.
+- Issuing the command this way has literally no effect. Saves no output, performs no action, just captures and ditches the CSI data.
+
+> VesperCSI needs root privileges to work.
+
+
+---
+
+## Configuring the Interface
+
+- Frequency, format, and channel width can be specified by the following syntax:
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --frequency 5180 --format VHT --channel-width 80
+```
+
+- By default, VesperCSI operates on frequency `2412` and `HT` format, and channel width of 20.
+- These parameters are set by the VesperCSI program via Netlink commands.
+
+
+---
+
+## Logging 
+
+- VesperCSI outputs relevant information about what is being perfomed in the background.
+- If one desires to save the log output to a file:
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --log-file hello.log
+```
+
+- To increase the verbosity of the log output:
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --verbose
+```
+
+- Verbosity level can be set with the optinal argument to `--verbose` option.
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --verbose=2
+```
+
+- To suppress all log output to the screen/file:
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --quiet
+```
+
+> Warning: The most optimal method to capture high rate CSI data is to eliminate unnecessary CPU time of other operations, especially the ones caused
+> by slow I/O operations. Use `--quiet` mode for maximum performance.
+
+
+---
+
+## Saving CSI Output
+
+- The captured CSI data can be written to a file:
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --out-file mycsi.dat
+```
+
+---
+
+## Filtering
+
+- By default, VesperCSI tries to match the frequency, format, and channel width to count it as a successful capture.
+- To remove any filtering on format and channel width:
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --unrestricted
+```
+
+> Frequency depends on the interface configuration.
+
+- VesperCSI captures all kinds of traffic coming from different kinds of devices. 
+- To force the VesperCSI to only capture a specific CSI data that is coming from a specific device:
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --source-mac 00:11:22:33:44:55
+```
+
+> This operation is performed on user-space, meaning that there is no kernel or hardware level optimization to ignore packets based on
+> their source MAC addresses. This option drops a CSI data immediatelly if it does not match to the one specified with `--source-mac`.
+
+
+---
+
+## Plugins
+
+- Functionality of VesperCSI tool can be extended with the help of plugins.
+- If you have a plugin with `.vesper` extension, you can make the tool load that plugin:
+
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --plugin myplugin.vesper
+```
+
+> Plugins are meant to be standalone work units. Whenever a CSI data is captured, it is also redirected to the callback function of
+> the plugin. It is plugin's responsibility to handle the CSI data.
+
+
+---
+
+## Configuration File
+
+- VesperCSI takes a command-line option called `--config-file` to configure it's internal working mechanism (\ref advanced). 
+
+```shell
+vespercsi -i aa:bb:cc:dd:ee:ff --config-file vespercsi.conf
+```
+
+---

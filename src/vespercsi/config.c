@@ -1,5 +1,6 @@
 #include <vespercsi/config.h>
 #include <vespercsi/options.h>
+#include <vespercsi/plugin.h>
 
 vespercsi_config_t vespercsi_config;
 
@@ -59,9 +60,15 @@ void vespercsi_config_init(vespercsi_config_t* config){
     }
 
 
-    if(config_lookup_string(&cfg, "plugin.path", &temp_str)){
-        vespercsi_config.plugin.path_set = true;
-        strncpy(vespercsi_config.plugin.path, temp_str, sizeof(vespercsi_config.plugin.path)-1);
+    if(!vespercsi_plugin.set){
+        if(config_lookup_string(&cfg, "plugin.path", &temp_str)){
+            vespercsi_config.plugin.set = true;
+            strncpy(vespercsi_config.plugin.path, temp_str, sizeof(vespercsi_config.plugin.path)-1);
+            strncpy(vespercsi_plugin.path, vespercsi_config.plugin.path, sizeof(vespercsi_plugin.path)-1);
+            vespercsi_plugin.set = true;        
+        }
+        
+
     }
 
     config_destroy(&cfg);

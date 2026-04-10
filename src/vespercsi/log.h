@@ -1,7 +1,7 @@
 #ifndef VESPERCSI_LOG_H
 #define VESPERCSI_LOG_H
 
-// DO NOT USE THE LOG FUNCTION INSIDE CAPTURE AND CONSUME THREADS
+// DO NOT USE THE LOG FUNCTION INSIDE CAPTURE AND CONSUME THREADS WHILE IN REAL USAGE, ONLY FOR DEBUGGING
 
 #include <vespercsi/vespercsi.h>
 #include <stdarg.h>
@@ -30,13 +30,19 @@ typedef enum vespercsi_log_level_t{
 #define PASS VESPERCSI_LOG_LEVEL_PASS
 #define DEBG VESPERCSI_LOG_LEVEL_DEBG
 
+#define VERBOSITY_0 0
+#define VERBOSITY_1 1
+#define VERBOSITY_2 2
+
 #define LOG(level, format, ...) {vespercsi_log(level, format, ##__VA_ARGS__);}
 
-#define LOG_VERBOSE(level, format, ...) if(vespercsi_options.verbose){vespercsi_log(level, format, ##__VA_ARGS__);}
+#define LOG_VERBOSE(verbosity_index, level, format, ...) if(vespercsi_options.verbose && verbosity_index <= vespercsi_options.verbosity){vespercsi_log(level, format, ##__VA_ARGS__);}
 
 extern FILE* vespercsi_log_file;
 
 void vespercsi_log_init(void);
+
+void vespercsi_log_destroy(void);
 
 void vespercsi_log(vespercsi_log_level_t log_level, const char* format, ...);
 

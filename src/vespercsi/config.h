@@ -17,6 +17,7 @@ typedef struct vespercsi_config_t{
 
             bool priority_set;
             int priority;
+
         }capture;
 
         struct{
@@ -29,7 +30,7 @@ typedef struct vespercsi_config_t{
     }runners;
 
     struct{
-        bool path_set;
+        bool set;
         char path[512];
     }plugin;
 
