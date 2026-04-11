@@ -145,6 +145,7 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
 
     }
 
+    
     nl_cb_put(cb);
     nl_cb_put(s_cb);
     nlmsg_free(msg);        
