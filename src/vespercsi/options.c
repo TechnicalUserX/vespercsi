@@ -50,7 +50,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
     optind = 0;
     int opt = 0;
     
-    while((opt = getopt_long(argc, argv, ":vhi:f:t:w:l:o:qu:p:s:c:ud",long_options,NULL)) != -1){
+    while((opt = getopt_long(argc, argv, ":vhi:f:t:w:l:o:qp:s:c:ud",long_options,NULL)) != -1){
 
         switch(opt){
     
