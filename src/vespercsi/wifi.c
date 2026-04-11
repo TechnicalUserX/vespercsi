@@ -3,6 +3,8 @@
 #include <vespercsi/options.h>
 #include <vespercsi/log.h>
 
+char vespercsi_wifi_original_interface[IFNAMSIZ] = {0};
+
 vespercsi_wifi_controller_t vespercsi_wifi_controller = {0};
 
 // API

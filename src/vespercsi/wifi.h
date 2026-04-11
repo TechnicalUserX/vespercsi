@@ -24,6 +24,8 @@
 
 #define VESPERCSI_WIFI_MONITOR_INTERFACE "vespercsimon"
 
+extern char vespercsi_wifi_original_interface[IFNAMSIZ];
+
 typedef struct vespercsi_wifi_interface_t{
     char name[VESPERCSI_WIFI_INTERFACE_NAME_STR_SIZE];
     int index;

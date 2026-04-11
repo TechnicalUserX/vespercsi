@@ -1,3 +1,4 @@
+#include "nl80211.h"
 #include <vespercsi/vespercsi.h>
 #include <vespercsi/netlink.h>
 #include <vespercsi/options.h>
@@ -72,13 +73,14 @@ int main(int argc, char* argv[]){
                 if(vespercsi_wifi_controller.interfaces[j].wiphy == vespercsi_wifi_controller.phys[i].index){
                     LOG_VERBOSE(VERBOSITY_1,INFO, "Removing %s", vespercsi_wifi_controller.interfaces[j].name);
                     vespercsi_wifi_remove_interface(&vespercsi_wifi_controller, vespercsi_wifi_controller.interfaces[j].name, 0);
+                    strncpy(vespercsi_wifi_original_interface, vespercsi_wifi_controller.interfaces[j].name, IFNAMSIZ - 1);
                     break;
                 }
             }
             break;
         }
     }
-    
+
     if(!phy_found){
         LOG(FAIL, "Intended physical Wi-Fi device not found on host");
         exit(EXIT_FAILURE);
@@ -145,6 +147,18 @@ int main(int argc, char* argv[]){
     vespercsi_csi_consume_stop();
 
     vespercsi_plugin_unload();
+
+    //==========================================================//
+    //=================== Interface Revert =====================//
+
+    LOG_VERBOSE(VERBOSITY_1, INFO, "Reverting %s to %s", VESPERCSI_WIFI_MONITOR_INTERFACE, vespercsi_wifi_original_interface);
+
+    vespercsi_wifi_remove_interface(&vespercsi_wifi_controller, VESPERCSI_WIFI_MONITOR_INTERFACE, 0);
+
+    vespercsi_wifi_add_device(&vespercsi_wifi_controller, vespercsi_wifi_original_interface, phy->index, NL80211_IFTYPE_STATION);
+
+    //==========================================================//
+    //================= Destroy Controllers ====================//
 
     vespercsi_csi_controller_destroy(&vespercsi_csi_controller);
 
