@@ -53,8 +53,9 @@ void vespercsi_csi_capture_start(void){
 }
 
 void vespercsi_csi_capture_stop(void){
-    LOG(INFO, "Capture Runner stopping");
+    LOG_VERBOSE(VERBOSITY_1, DEBG, "Capture Runner stopping");
     pthread_join(vespercsi_csi_controller.runner_capture_thread, NULL);
+    LOG_VERBOSE(VERBOSITY_2, DEBG, "Capture Runner stopped");
 }
 
 void vespercsi_csi_consume_start(void){
@@ -63,8 +64,9 @@ void vespercsi_csi_consume_start(void){
 }
 
 void vespercsi_csi_consume_stop(void){
-    LOG(INFO, "Consume Runner stopping");
+    LOG_VERBOSE(VERBOSITY_1, DEBG, "Consume Runner stopping");
     pthread_join(vespercsi_csi_controller.runner_consume_thread, NULL);
+    LOG_VERBOSE(VERBOSITY_2, DEBG, "Consume Runner stopped");
 }
 
 static inline void vespercsi_csi_ringbuffer_swap_handler(void){
