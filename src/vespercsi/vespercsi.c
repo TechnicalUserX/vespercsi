@@ -40,6 +40,8 @@ int main(int argc, char* argv[]){
 
     vespercsi_csi_controller_init(&vespercsi_csi_controller);
 
+    LOG(INFO, "VesperCSI initialized");
+
     //==========================================================//
     //====================== Load Plugin =======================//
 
