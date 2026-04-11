@@ -136,19 +136,8 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
             int recv_err = nl_recvmsgs(netlink->netlink_socket, cb);
             if (recv_err < 0) {
                 LOG_VERBOSE(VERBOSITY_2, WARN, "Netlink: nl_recvmsgs() returned %d: %s", recv_err, strerror(nl_syserr2nlerr(recv_err)));
-
-                int filled_bytes = 0;
-                if (!(ioctl(netlink->netlink_socket_fd, FIONREAD, &filled_bytes) < 0)) {
-                    LOG_VERBOSE(VERBOSITY_2, WARN, "Netlink: Receive buffer filled up to %d", filled_bytes);
-                }
-
-                // nl_cb_put(cb);
-                // nl_cb_put(s_cb);
-                // nlmsg_free(msg); 
-                // return VESPERCSI_FAIL;
             }
         }
-
     }
 
 
