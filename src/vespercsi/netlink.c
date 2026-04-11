@@ -132,10 +132,10 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
         }
 
         if (fds[0].revents & POLLIN){
-            LOG_VERBOSE(VERBOSITY_2, DEBG, "Netlink: execution returned a response")
+            //LOG_VERBOSE(VERBOSITY_2, DEBG, "Netlink: execution returned a response")
             int recv_err = nl_recvmsgs(netlink->netlink_socket, cb);
             if (recv_err < 0) {
-                LOG(FAIL, "Netlink: nl_recvmsgs() returned %d: %s", recv_err, strerror(nl_syserr2nlerr(recv_err)));
+                //LOG(FAIL, "Netlink: nl_recvmsgs() returned %d: %s", recv_err, strerror(nl_syserr2nlerr(recv_err)));
                 nl_cb_put(cb);
                 nl_cb_put(s_cb);
                 nlmsg_free(msg); 
