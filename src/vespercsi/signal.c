@@ -8,6 +8,8 @@ int vespercsi_signal_shutdown_pipe[2] = {0};
 
 volatile sig_atomic_t vespercsi_signal_shutdown_flag = false;
 
+static int vespercsi_signal_sigint_count = 0;
+
 void vespercsi_signal_init(void){
 
     struct sigaction sa = {
@@ -32,8 +34,14 @@ void vespercsi_signal_destroy(void){
 }
 
 void vespercsi_signal_sigint_handler(int s){
+    vespercsi_signal_sigint_count++;
+
     if (vespercsi_signal_shutdown_flag == false) {
         vespercsi_signal_shutdown_flag = true;
         write(vespercsi_signal_shutdown_pipe[1], "\x00", 1);
     }
+
+    if(vespercsi_signal_sigint_count == 3){
+        exit(EXIT_SUCCESS);
+    }    
 }
