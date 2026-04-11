@@ -34,7 +34,9 @@ void vespercsi_wifi_get_phys(vespercsi_wifi_controller_t* controller){
         .valid_handler = vespercsi_wifi_get_phys_handler,
     };
 
-    vespercsi_netlink_execute(&controller->netlink, &command);
+    if(vespercsi_netlink_execute(&controller->netlink, &command) == VESPERCSI_FAIL){
+        raise(SIGINT);
+    }
 }
 
 void vespercsi_wifi_get_interfaces(vespercsi_wifi_controller_t* controller){
@@ -47,7 +49,9 @@ void vespercsi_wifi_get_interfaces(vespercsi_wifi_controller_t* controller){
         .valid_handler = vespercsi_wifi_get_interfaces_handler,
     };
 
-    vespercsi_netlink_execute(&controller->netlink, &command);
+    if(vespercsi_netlink_execute(&controller->netlink, &command) == VESPERCSI_FAIL){
+        raise(SIGINT);
+    }
 }
 
 void vespercsi_wifi_get_single_interface(vespercsi_wifi_controller_t* controller, vespercsi_wifi_interface_t* interface, const char *ifname){
@@ -62,7 +66,9 @@ void vespercsi_wifi_get_single_interface(vespercsi_wifi_controller_t* controller
         .args = (void*)interface
     };
 
-    vespercsi_netlink_execute(&controller->netlink, &command);
+    if(vespercsi_netlink_execute(&controller->netlink, &command) == VESPERCSI_FAIL){
+        raise(SIGINT);
+    }
 }
 
 void vespercsi_wifi_remove_interface(vespercsi_wifi_controller_t* controller, const char *name, int index){
@@ -75,7 +81,9 @@ void vespercsi_wifi_remove_interface(vespercsi_wifi_controller_t* controller, co
         .valid_handler = NULL,
     };
 
-    vespercsi_netlink_execute(&controller->netlink, &command);
+    if(vespercsi_netlink_execute(&controller->netlink, &command) == VESPERCSI_FAIL){
+        raise(SIGINT);
+    }
 }
 
 void vespercsi_wifi_set_interface_frequency(vespercsi_wifi_controller_t* controller, const char* ifname, uint16_t freq, const char *bw){
@@ -92,7 +100,9 @@ void vespercsi_wifi_set_interface_frequency(vespercsi_wifi_controller_t* control
         .args = settings,
     };
 
-    vespercsi_netlink_execute(&controller->netlink, &command);
+    if(vespercsi_netlink_execute(&controller->netlink, &command) == VESPERCSI_FAIL){
+        raise(SIGINT);
+    }
 }
 
 
@@ -155,7 +165,9 @@ void vespercsi_wifi_add_device(vespercsi_wifi_controller_t* controller, const ch
         .args = settings,
     };
     
-    vespercsi_netlink_execute(&controller->netlink, &command);
+    if(vespercsi_netlink_execute(&controller->netlink, &command) == VESPERCSI_FAIL){
+        raise(SIGINT);
+    }
 
 }
 

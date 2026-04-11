@@ -1,3 +1,4 @@
+#include "netlink/errno.h"
 #include <vespercsi/signal.h>
 #include <vespercsi/netlink.h>
 #include <vespercsi/log.h>
@@ -134,8 +135,11 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
             LOG_VERBOSE(VERBOSITY_2, DEBG, "Netlink: execution returned a response")
             int recv_err = nl_recvmsgs(netlink->netlink_socket, cb);
             if (recv_err < 0) {
-                LOG(FAIL, "Netlink: nl_recvmsgs() returned exit code: %d", recv_err);
-                err = recv_err; // Break the loop and report the error
+                LOG(FAIL, "Netlink: nl_recvmsgs() returned %d: %s", recv_err, strerror(nl_syserr2nlerr(recv_err)));
+                nl_cb_put(cb);
+                nl_cb_put(s_cb);
+                nlmsg_free(msg); 
+                return VESPERCSI_FAIL;
             }
         }
 
@@ -149,10 +153,10 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
         return VESPERCSI_OK;
     }
 
-    LOG(FAIL, "nl_recvmsgs() failure: %s", strerror(-err));
+    LOG(FAIL, "Netlink: nl_recvmsgs() failure: %s", strerror(-err));
     return VESPERCSI_FAIL;
 nla_put_failure:
-    LOG(FAIL, "NLA_PUT_32() failure");
+    LOG(FAIL, "Netlink: NLA_PUT_32() failure");
     return VESPERCSI_FAIL;
 }
 

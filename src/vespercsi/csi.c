@@ -105,7 +105,9 @@ void* vespercsi_csi_capture_runner(void* arg){
         vespercsi_csi_runner_set_realtime_priority(vespercsi_config.runners.capture.priority);
     }
 
-    vespercsi_csi_listen(&vespercsi_csi_controller);
+    if(vespercsi_csi_listen(&vespercsi_csi_controller) == VESPERCSI_FAIL){
+        raise(SIGINT);
+    }
 
     pthread_exit(NULL);
 }

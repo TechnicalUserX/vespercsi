@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <sys/ioctl.h>
 #include <dirent.h>
+#include <signal.h>
 
 
 #define VESPERCSI_WIFI_INTERFACE_MAX_SIZE 20
