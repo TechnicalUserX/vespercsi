@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <linux/netlink.h>
 #include <linux/nl80211.h>
+#include <sys/ioctl.h>
 
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
 
