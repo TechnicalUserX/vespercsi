@@ -12,6 +12,11 @@ int vespercsi_netlink_init(vespercsi_netlink_t* netlink){
     }
     netlink->netlink_socket_fd = nl_socket_get_fd(netlink->netlink_socket);
 
+    if(netlink->netlink_socket_fd < 0){
+        LOG(FAIL, "Cannot retrieve file descriptor of Netlink socket");
+        return VESPERCSI_FAIL;
+    }
+
     if(genl_connect(netlink->netlink_socket)){
         LOG(FAIL, "Cannot connect to netlink socket");
         return VESPERCSI_FAIL;
@@ -111,17 +116,24 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
         int ret = poll(fds, 2, -1);
 
         if (ret < 0) {
-            if (errno == EINTR) continue;  // signal interrupted poll, loop again
+            if (errno == EINTR){
+                LOG_VERBOSE(VERBOSITY_2, DEBG, "Netlink: execution received an external interrupt, continuing...");
+                continue;  // signal interrupted poll, loop again
+            }
+            LOG(FAIL, "Netlink: execution fatal error");
             break;                          // real error
         }
 
         if (fds[1].revents & POLLIN){
+            LOG_VERBOSE(VERBOSITY_2, DEBG, "Netlink: execution interrupted for graceful shutdown");
             break;  // shutdown signaled
         }
 
         if (fds[0].revents & POLLIN){
+            LOG_VERBOSE(VERBOSITY_2, DEBG, "Netlink: execution returned a response")
             int recv_err = nl_recvmsgs(netlink->netlink_socket, cb);
             if (recv_err < 0) {
+                LOG(FAIL, "Netlink: nl_recvmsgs() returned exit code: %d", recv_err);
                 err = recv_err; // Break the loop and report the error
             }
         }
