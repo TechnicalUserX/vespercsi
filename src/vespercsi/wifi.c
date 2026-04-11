@@ -10,7 +10,7 @@ vespercsi_wifi_controller_t vespercsi_wifi_controller = {0};
 void vespercsi_wifi_controller_init(vespercsi_wifi_controller_t* controller){
 
     if(vespercsi_netlink_init(&controller->netlink) == VESPERCSI_FAIL){
-       fprintf(stdout, "VesperCSI: Cannot initalize Wi-Fi Controller netlink");
+       printf("VesperCSI: Cannot initalize Wi-Fi Controller netlink\n");
        exit(EXIT_FAILURE); 
     }
     

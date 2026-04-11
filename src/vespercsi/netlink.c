@@ -7,18 +7,12 @@ int vespercsi_netlink_init(vespercsi_netlink_t* netlink){
     netlink->netlink_socket = nl_socket_alloc();
 
     if(!netlink->netlink_socket){
-        LOG(FAIL, "Cannot allocate a netlink socket");
-        return VESPERCSI_FAIL;
-    }
-    netlink->netlink_socket_fd = nl_socket_get_fd(netlink->netlink_socket);
-
-    if(netlink->netlink_socket_fd < 0){
-        LOG(FAIL, "Cannot retrieve file descriptor of Netlink socket");
+        printf("VesperCSI: Cannot allocate a netlink socket\n");
         return VESPERCSI_FAIL;
     }
 
     if(genl_connect(netlink->netlink_socket)){
-        LOG(FAIL, "Cannot connect to netlink socket");
+        printf("VesperCSI: Cannot connect to netlink socket\n");
         return VESPERCSI_FAIL;
     }
 
@@ -30,7 +24,14 @@ int vespercsi_netlink_init(vespercsi_netlink_t* netlink){
     netlink->nl80211_id = genl_ctrl_resolve(netlink->netlink_socket, "nl80211");
 
     if(netlink->nl80211_id  < 0){
-        LOG(FAIL, "Cannot resolve nl80211 id");
+        printf("VesperCSI: Cannot resolve nl80211 id\n");
+        return VESPERCSI_FAIL;
+    }
+
+    netlink->netlink_socket_fd = nl_socket_get_fd(netlink->netlink_socket);
+
+    if(netlink->netlink_socket_fd < 0){
+        printf( "VesperCSI: Cannot retrieve file descriptor of Netlink socket\n");
         return VESPERCSI_FAIL;
     }
 

@@ -20,7 +20,7 @@ atomic_int vespercsi_capture_dirty_flag = ATOMIC_VAR_INIT(0);
 void vespercsi_csi_controller_init(vespercsi_csi_controller_t* controller){
 
     if(vespercsi_netlink_init(&vespercsi_csi_controller.netlink) == VESPERCSI_FAIL){
-       fprintf(stdout, "VesperCSI: Cannot initalize CSI Controller netlink");
+       printf("VesperCSI: Cannot initalize CSI Controller netlink\n");
        exit(EXIT_FAILURE); 
     }
 
