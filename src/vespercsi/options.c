@@ -44,6 +44,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
        { "config-file",    required_argument,  NULL,   'c'},
        { "unrestricted",   no_argument,        NULL,   'u'},      
        { "daemon",         no_argument,        NULL,   'd'},       
+       { "netlink-buffer-instant-death",    no_argument,    NULL,1001},       
        { NULL,             0,                  NULL,   0  }   
     };
 
@@ -187,6 +188,10 @@ void vespercsi_options_parse(int argc, char* argv[]){
                 // Version
                 printf("VesperCSI: Version: %s\n", VESPERCSI_VERSION);
                 exit(EXIT_SUCCESS);
+            }break;
+
+            case 1001:{
+                vespercsi_options.netlink_buffer_instant_death = true;
             }break;
         }
     

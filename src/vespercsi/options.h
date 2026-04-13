@@ -48,6 +48,8 @@ typedef struct vespercsi_options_t{
 
     bool unrestricted;
 
+    bool netlink_buffer_instant_death;
+
     bool daemon;
 }vespercsi_options_t;
 
