@@ -46,6 +46,9 @@ typedef struct vespercsi_options_t{
     bool config_file_set;
     char config_file_path[512];
 
+    uint8_t num_rx;
+    uint8_t num_tx;
+
     bool unrestricted;
 
     bool netlink_buffer_instant_death;

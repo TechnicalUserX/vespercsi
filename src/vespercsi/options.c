@@ -12,6 +12,8 @@ vespercsi_options_t vespercsi_options = {
     .frequency = 2412,
     .format = "HT",
     .channel_width = 20,
+    .num_rx = 0,
+    .num_tx = 0,
     .verbose = false,
     .verbosity = 0,
     .log_file_set = false,
@@ -34,6 +36,8 @@ void vespercsi_options_parse(int argc, char* argv[]){
         { "frequency",      required_argument,  NULL,   'f'},
         { "format",         required_argument,  NULL,   't'},
         { "channel-width",  required_argument,  NULL,   'w'},
+        { "num-rx",         required_argument,  NULL,   900},
+        { "num-tx",         required_argument,  NULL,   901},
         { "plugin",         required_argument,  NULL,   'p'},
         { "verbose",        optional_argument,  NULL,   'v'},
         { "version",        no_argument,        NULL,   1000},
@@ -78,6 +82,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
 
             case 'q':{
                 vespercsi_options.verbose = false;
+                vespercsi_options.verbosity = 0;
                 vespercsi_options.quiet = true;
             }break;            
 
@@ -124,6 +129,24 @@ void vespercsi_options_parse(int argc, char* argv[]){
                 }
                 strncpy(vespercsi_options.bandwidth, optarg, sizeof(vespercsi_options.bandwidth)-1);
                 vespercsi_options.channel_width = vespercsi_wifi_channel_mode_to_width(&mode);
+            }break;
+
+            case 900:{
+                int n = atoi(optarg);
+                if(n < 1 || n > 2){
+                    printf("VesperCSI: Bad RX count");
+                    exit(EXIT_FAILURE);
+                }
+                vespercsi_options.num_rx = n;
+            }break;
+
+            case 901:{
+                int n = atoi(optarg);
+                if(n < 1 || n > 2){
+                    printf("VesperCSI: Bad TX count");
+                    exit(EXIT_FAILURE);
+                }
+                vespercsi_options.num_tx = n;
             }break;
 
             case 'p':{

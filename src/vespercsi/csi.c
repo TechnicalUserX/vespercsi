@@ -167,15 +167,12 @@ void* vespercsi_csi_consume_runner(void* arg){
 
         }else{
             // BUFFER IS EMPTY. 
-            // 1. PEEK: Do a cheap, relaxed read to see if the flag is 1.
+            // PEEK: Do a cheap, relaxed read to see if the flag is 1.
             // This does NOT lock the memory bus.
             if (atomic_load_explicit(&vespercsi_capture_dirty_flag, memory_order_relaxed) == 1) {
-                // 2. CLEAR: Safely reset the flag to 0. 
-                // memory_order_acquire pairs with the capture thread's release.
-                atomic_exchange_explicit(&vespercsi_capture_dirty_flag, 0, memory_order_acquire);
 
-                // 3. SWAP: Now that the flag is clear, perform the heavy buffer swap.
                 while(atomic_flag_test_and_set_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_acquire));
+                atomic_exchange_explicit(&vespercsi_capture_dirty_flag, 0, memory_order_acquire);
                 vespercsi_csi_ringbuffer_swap_handler();
                 atomic_flag_clear_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_release);
             
@@ -224,8 +221,8 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
 
     static uint64_t counter = 0;
 
-    static vespercsi_csi_metadata_t current_csi_metadata = {0};
-    static vespercsi_csi_data_t current_csi_data = {0};
+    vespercsi_csi_metadata_t current_csi_metadata = {0};
+    vespercsi_csi_data_t current_csi_data = {0};
 
     struct nlattr *attrs[MAX_CMD + 1];
     struct nlmsghdr *nlh = nlmsg_hdr(msg);
@@ -271,83 +268,82 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
                 return NL_SKIP;
             }
 
-            if( (vespercsi_options.unrestricted) || 
-                (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_20 && vespercsi_options.channel_width == 20) ||
-                (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_40 && vespercsi_options.channel_width == 40) ||
-                (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_80 && vespercsi_options.channel_width == 80) ||
-                (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_160 && vespercsi_options.channel_width == 160)
-            
+            if(!vespercsi_options.unrestricted && ((vespercsi_options.num_rx && current_csi_metadata.num_rx != vespercsi_options.num_rx) ||
+                                                          (vespercsi_options.num_tx && current_csi_metadata.num_tx != vespercsi_options.num_tx)) ){
+                LOG_VERBOSE(VERBOSITY_2, DEBG, "Capture: Packet Dropped (Reason -> RX/TX Count Mismatch)");
+                return NL_SKIP;
+            }
+
+            if( !vespercsi_options.unrestricted &&
+                ((current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_20 && vespercsi_options.channel_width != 20) ||
+                (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_40 && vespercsi_options.channel_width != 40) ||
+                (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_80 && vespercsi_options.channel_width != 80) ||
+                (current_csi_metadata.channel_width == RATE_MCS_CHAN_WIDTH_160 && vespercsi_options.channel_width != 160))
+
             ){
-                if( (vespercsi_options.unrestricted) || 
-                    (current_csi_metadata.format == RATE_MCS_LEGACY_OFDM_MSK && strcmp(vespercsi_options.format ,"NOHT") == 0) ||
-                    (current_csi_metadata.format == RATE_MCS_HT_MSK && strcmp(vespercsi_options.format ,"HT") == 0) ||
-                    (current_csi_metadata.format == RATE_MCS_VHT_MSK && strcmp(vespercsi_options.format ,"VHT") == 0) ||
-                    (current_csi_metadata.format == RATE_MCS_HE_MSK && strcmp(vespercsi_options.format ,"HESU") == 0) ||
-                    (current_csi_metadata.format == RATE_MCS_EHT_MSK && strcmp(vespercsi_options.format ,"EHT") == 0)
-                ){
-                    // CSI Captured
-                    if(vespercsi_options.verbose){
-                        counter++;
-                    }
+                LOG_VERBOSE(VERBOSITY_2, DEBG, "Capture: Packet Dropped (Reason -> Channel Width Mismatch)");
+                return NL_SKIP;
+            }
+     
+            if( !vespercsi_options.unrestricted && 
+                ((current_csi_metadata.format == RATE_MCS_LEGACY_OFDM_MSK && strcmp(vespercsi_options.format ,"NOHT") != 0) ||
+                (current_csi_metadata.format == RATE_MCS_HT_MSK && strcmp(vespercsi_options.format ,"HT") != 0) ||
+                (current_csi_metadata.format == RATE_MCS_VHT_MSK && strcmp(vespercsi_options.format ,"VHT") != 0) ||
+                (current_csi_metadata.format == RATE_MCS_HE_MSK && strcmp(vespercsi_options.format ,"HESU") != 0) ||
+                (current_csi_metadata.format == RATE_MCS_EHT_MSK && strcmp(vespercsi_options.format ,"EHT") != 0))
+            ){
+                LOG_VERBOSE(VERBOSITY_2, DEBG, "Capture: Packet Dropped (Reason -> Format Mismatch)");
+                return NL_SKIP;
+            }
+                
+            // CSI Captured, Valid One
 
-                    current_csi_metadata.header.timestamp = vespercsi_csi_wallclock_us();
+            if(vespercsi_options.verbose){
+                counter++;
+            }
 
-                    vespercsi_csi_t csi = {
-                        current_csi_metadata.header,
-                        current_csi_data
-                    };
+            current_csi_metadata.header.timestamp = vespercsi_csi_wallclock_us();
 
-                    while (atomic_flag_test_and_set_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_acquire));
-                    if(vespercsi_csi_ringbuffer_capture->free_memory == NULL){
-                        vespercsi_csi_ringbuffer_listpool_remove(vespercsi_csi_ringbuffer_capture, vespercsi_csi_ringbuffer_capture->back);
-                    }
-                    
-                    // if (vespercsi_csi_ringbuffer_capture->size >= VESPERCSI_CSI_BATCH_FLUSH_SIZE || (current_time - last_flush_time) >= VESPERCSI_CSI_BATCH_FLUSH_INTERVAL) {
-                    //     should_signal_swap = true;
-                    //     last_flush_time = current_time;
-                    // }
+            vespercsi_csi_t csi = {
+                current_csi_metadata.header,
+                current_csi_data
+            };
 
-                    vespercsi_csi_ringbuffer_listpool_status_t status = vespercsi_csi_ringbuffer_listpool_push_front(vespercsi_csi_ringbuffer_capture, &csi);
-                    atomic_flag_clear_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_release);
+            // LOCK BUFFER
+            while (atomic_flag_test_and_set_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_acquire));
+            if(vespercsi_csi_ringbuffer_capture->free_memory == NULL){
+            vespercsi_csi_ringbuffer_listpool_remove(vespercsi_csi_ringbuffer_capture, vespercsi_csi_ringbuffer_capture->back);
+            }
+            vespercsi_csi_ringbuffer_listpool_status_t status = vespercsi_csi_ringbuffer_listpool_push_front(vespercsi_csi_ringbuffer_capture, &csi);
+            
+            if(status == VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_SUCCESS){
+                atomic_store_explicit(&vespercsi_capture_dirty_flag, 1, memory_order_release);
+            }
 
-                    switch(status){
-                        case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_SUCCESS:{
-                            LOG_VERBOSE(VERBOSITY_2, DEBG, "Capture: Pushed CSI %lu", counter);
-                        }break;
+            atomic_flag_clear_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_release);
+            // UNLOCK BUFFER
 
-                        case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NO_MEMORY:{
-                            LOG_VERBOSE(VERBOSITY_0, WARN, "Capture: No memory to push CSI in listpool ring buffer");
-                        }break;
+            switch(status){
+                case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_SUCCESS:{
+                    LOG_VERBOSE(VERBOSITY_2, DEBG, "Capture: Pushed CSI %lu", counter);
+                }break;
 
-                        case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NULL_VALUE:{
-                            LOG_VERBOSE(VERBOSITY_0, WARN, "Capture: Null value while pushing CSI");
-                        }break;
-                     
-                 
-                        default:break;
-                    }
+                case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NO_MEMORY:{
+                    LOG_VERBOSE(VERBOSITY_0, WARN, "Capture: No memory to push CSI in listpool ring buffer");
+                }break;
 
-                    //if (should_signal_swap) {
-                        atomic_store_explicit(&vespercsi_capture_dirty_flag, 1, memory_order_release);
-                    //}
-
-                }
-
+                case VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NULL_VALUE:{
+                    LOG_VERBOSE(VERBOSITY_0, WARN, "Capture: Null value while pushing CSI");
+                }break;
+                
+            
+                default:break;
             }
 
         }
     }
 
-    // We should probably do timeout checking here for termination
 
-    /*
-    WiFiCsiController *wcc = (WiFiCsiController*) arg;
-    auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    if (wcc->stopTime != 0 && wcc->stopTime < now)
-    {
-        return NL_OK;
-    }
-    */
     return NL_SKIP;
 }
 
