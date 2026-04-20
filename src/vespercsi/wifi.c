@@ -147,7 +147,7 @@ int vespercsi_wifi_set_interface_updown(const char *ifname, bool up){
     // Close the socket
     close(sockfd);
 
-    LOG_VERBOSE(VERBOSITY_0, INFO, "Interface %s has been brought %s", ifname, (up ? "up" : "down"));
+    LOG_VERBOSE(VERBOSITY_1, INFO, "Interface %s has been brought %s", ifname, (up ? "up" : "down"));
 
     return 0;
 }
@@ -341,7 +341,7 @@ int vespercsi_wifi_set_interface_frequency_handler(vespercsi_netlink_t *state, s
     char *settingsWidth = (char *)(settings[1]);
 
 
-    LOG_VERBOSE(VERBOSITY_0, INFO, "Setting frequency %hu - Channel Width: %s", settingsFreq, settingsWidth);
+    LOG_VERBOSE(VERBOSITY_1, INFO, "Setting frequency %hu - Channel Width: %s", settingsFreq, settingsWidth);
 
     uint32_t freq = settingsFreq;
     uint32_t freq_offset = 0;
