@@ -97,7 +97,7 @@ int main(int argc, char* argv[]){
         vespercsi_wifi_set_interface_frequency(&vespercsi_wifi_controller, VESPERCSI_WIFI_MONITOR_INTERFACE, vespercsi_options.frequency, vespercsi_options.bandwidth);
         vespercsi_wifi_get_single_interface(&vespercsi_wifi_controller, &current_interface, VESPERCSI_WIFI_MONITOR_INTERFACE);
         usleep(100);
-    }while(current_interface.freq != vespercsi_options.frequency);
+    }while(current_interface.freq != vespercsi_options.frequency || current_interface.channel_width != vespercsi_options.channel_width);
 
     if(vespercsi_wifi_toggle_iwlwifi(true) == VESPERCSI_FAIL){
         LOG(FAIL, "Cannot enable CSI capturing on the interface %s", VESPERCSI_WIFI_MONITOR_INTERFACE);
@@ -150,11 +150,15 @@ int main(int argc, char* argv[]){
     //==========================================================//
     //=================== Interface Revert =====================//
 
-    LOG_VERBOSE(VERBOSITY_1, INFO, "Reverting %s to %s", VESPERCSI_WIFI_MONITOR_INTERFACE, vespercsi_wifi_original_interface);
+    if(strcmp(vespercsi_wifi_original_interface, "") != 0){
 
-    vespercsi_wifi_remove_interface(&vespercsi_wifi_controller, VESPERCSI_WIFI_MONITOR_INTERFACE, 0);
+        LOG_VERBOSE(VERBOSITY_1, INFO, "Reverting %s to %s", VESPERCSI_WIFI_MONITOR_INTERFACE, vespercsi_wifi_original_interface);
 
-    vespercsi_wifi_add_device(&vespercsi_wifi_controller, vespercsi_wifi_original_interface, phy->index, NL80211_IFTYPE_STATION);
+        vespercsi_wifi_remove_interface(&vespercsi_wifi_controller, VESPERCSI_WIFI_MONITOR_INTERFACE, 0);
+
+        vespercsi_wifi_add_device(&vespercsi_wifi_controller, vespercsi_wifi_original_interface, phy->index, NL80211_IFTYPE_STATION);
+
+    }
 
     //==========================================================//
     //================= Destroy Controllers ====================//
