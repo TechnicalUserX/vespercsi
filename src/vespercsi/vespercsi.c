@@ -71,6 +71,13 @@ int main(int argc, char* argv[]){
             for(int j = 0; j < vespercsi_wifi_controller.interfaces_size; j++){
                 if(vespercsi_wifi_controller.interfaces[j].wiphy == vespercsi_wifi_controller.phys[i].index){
                     LOG_VERBOSE(VERBOSITY_1,INFO, "Removing %s", vespercsi_wifi_controller.interfaces[j].name);
+                    
+                    if(vespercsi_wifi_set_interface_updown(vespercsi_wifi_controller.interfaces[j].name, false) == VESPERCSI_FAIL){
+                        LOG(FAIL, "Could not bring %s interface down", vespercsi_wifi_controller.interfaces[j].name);
+                        exit(EXIT_FAILURE);
+                    }
+                    
+                    usleep(1000);
                     vespercsi_wifi_remove_interface(&vespercsi_wifi_controller, vespercsi_wifi_controller.interfaces[j].name, 0);
                     strncpy(vespercsi_wifi_original_interface, vespercsi_wifi_controller.interfaces[j].name, IFNAMSIZ - 1);
                     break;
@@ -156,7 +163,10 @@ int main(int argc, char* argv[]){
 
         LOG_VERBOSE(VERBOSITY_1, INFO, "Reverting %s to %s", VESPERCSI_WIFI_MONITOR_INTERFACE, vespercsi_wifi_original_interface);
 
+        // Best effort
         vespercsi_wifi_add_device(&vespercsi_wifi_controller, vespercsi_wifi_original_interface, phy->index, NL80211_IFTYPE_STATION);
+        vespercsi_wifi_set_interface_updown(vespercsi_wifi_original_interface, true);
+
     }
 
     //==========================================================//

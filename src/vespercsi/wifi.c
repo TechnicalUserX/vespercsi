@@ -114,7 +114,7 @@ int vespercsi_wifi_set_interface_updown(const char *ifname, bool up){
     if (sockfd < 0)
     {
         perror("Failed to create socket");
-        return 1;
+        return VESPERCSI_FAIL;
     }
 
     // Get the interface index
@@ -125,7 +125,7 @@ int vespercsi_wifi_set_interface_updown(const char *ifname, bool up){
     {
         perror("Failed to get interface index");
         close(sockfd);
-        return 1;
+        return VESPERCSI_FAIL;
     }
 
     if (up)
@@ -141,7 +141,7 @@ int vespercsi_wifi_set_interface_updown(const char *ifname, bool up){
     {
         perror("Failed to bring down interface");
         close(sockfd);
-        return 1;
+        return VESPERCSI_FAIL;
     }
 
     // Close the socket
@@ -149,7 +149,7 @@ int vespercsi_wifi_set_interface_updown(const char *ifname, bool up){
 
     LOG_VERBOSE(VERBOSITY_1, INFO, "Interface %s has been brought %s", ifname, (up ? "up" : "down"));
 
-    return 0;
+    return VESPERCSI_OK;
 }
 
 void vespercsi_wifi_add_device(vespercsi_wifi_controller_t* controller, const char *name, uint64_t phy_id, const enum nl80211_iftype type)
@@ -432,6 +432,7 @@ int vespercsi_wifi_add_device_handler(vespercsi_netlink_t *state, struct nl_msg 
     const char *name = (const char *)settings[0];
     enum nl80211_iftype *type = (enum nl80211_iftype *)(settings[1]);
 
+    NLA_PUT_FLAG(msg, NL80211_ATTR_SOCKET_OWNER);
     NLA_PUT_STRING(msg, NL80211_ATTR_IFNAME, name);
     NLA_PUT_U32(msg, NL80211_ATTR_IFTYPE, *type);
     NLA_PUT(msg, NL80211_ATTR_MAC, ETH_ALEN, vespercsi_options.interface_mac);
