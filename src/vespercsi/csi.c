@@ -321,19 +321,18 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
             // LOCK BUFFER
             while (atomic_flag_test_and_set_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_acquire));
             if(vespercsi_csi_ringbuffer_capture->free_memory == NULL){
-            vespercsi_csi_ringbuffer_listpool_remove(vespercsi_csi_ringbuffer_capture, vespercsi_csi_ringbuffer_capture->back);
+                if(vespercsi_options.ring_buffer_instant_death){
+                    LOG(FAIL, "Capture: Ring buffer full while trying to push (Instant Death)");                
+                    exit(EXIT_FAILURE);  
+                }
+
+                vespercsi_csi_ringbuffer_listpool_remove(vespercsi_csi_ringbuffer_capture, vespercsi_csi_ringbuffer_capture->back);
             }
             vespercsi_csi_ringbuffer_listpool_status_t status = vespercsi_csi_ringbuffer_listpool_push_front(vespercsi_csi_ringbuffer_capture, &csi);
             
             if(status == VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_SUCCESS){
                 atomic_store_explicit(&vespercsi_capture_dirty_flag, 1, memory_order_release);
-            }else if(status == VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NO_MEMORY && vespercsi_options.ring_buffer_instant_death){
-                // Buffer full while trying to push, instant death!
-                // Use this only for debugging
-                LOG(FAIL, "Capture: Ring buffer full while trying to push (Instant Death)");                
-                exit(EXIT_FAILURE);                      
             }
-
             atomic_flag_clear_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_release);
             // UNLOCK BUFFER
 

@@ -24,8 +24,9 @@ vespercsi_options_t vespercsi_options = {
     .bandwidth = "20",
     .src_mac_set = false,
     .src_mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66},
-    .unrestricted = false
-
+    .unrestricted = false,
+    .netlink_buffer_instant_death = false,
+    .ring_buffer_instant_death = false
 };
 
 void vespercsi_options_parse(int argc, char* argv[]){
