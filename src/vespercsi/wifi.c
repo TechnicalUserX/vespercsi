@@ -432,7 +432,6 @@ int vespercsi_wifi_add_device_handler(vespercsi_netlink_t *state, struct nl_msg 
     const char *name = (const char *)settings[0];
     enum nl80211_iftype *type = (enum nl80211_iftype *)(settings[1]);
 
-    NLA_PUT_FLAG(msg, NL80211_ATTR_SOCKET_OWNER);
     NLA_PUT_STRING(msg, NL80211_ATTR_IFNAME, name);
     NLA_PUT_U32(msg, NL80211_ATTR_IFTYPE, *type);
     NLA_PUT(msg, NL80211_ATTR_MAC, ETH_ALEN, vespercsi_options.interface_mac);
