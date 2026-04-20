@@ -1,4 +1,3 @@
-#include "nl80211.h"
 #include <vespercsi/vespercsi.h>
 #include <vespercsi/netlink.h>
 #include <vespercsi/options.h>

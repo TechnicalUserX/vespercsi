@@ -224,8 +224,13 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
     vespercsi_csi_metadata_t current_csi_metadata = {0};
     vespercsi_csi_data_t current_csi_data = {0};
 
-    struct nlattr *attrs[MAX_CMD + 1];
+    struct nlattr *attrs[MAX_CMD + 1] = {NULL};
     struct nlmsghdr *nlh = nlmsg_hdr(msg);
+
+    if(nlh == NULL){
+        LOG_VERBOSE(VERBOSITY_2, WARN, "Capture: Invalid header parsing");
+        return NL_SKIP;
+    }
 
     nlmsg_parse(nlh, 32, attrs, MAX_CMD, NULL);
 
@@ -239,6 +244,11 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
 
         uint8_t *header = (uint8_t *)nla_data(attrs[IWL_MVM_VENDOR_ATTR_CSI_HDR]);
 
+        if(header == NULL){
+            LOG_VERBOSE(VERBOSITY_2, WARN, "Capture: Header bytes not present");
+            return NL_SKIP;
+        }
+
         memcpy(&current_csi_metadata.header, header, header_length);
         
         if(vespercsi_options.src_mac_set && memcmp(current_csi_metadata.header.src_mac, vespercsi_options.src_mac, 6) != 0){
@@ -250,7 +260,7 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
             unsigned int data_length = nla_len(attrs[IWL_MVM_VENDOR_ATTR_CSI_DATA]);
 
             if (data_length > VESPERCSI_CSI_DATA_SIZE_MAX) {
-                LOG_VERBOSE(VERBOSITY_0, WARN, "Capture: Received CSI payload too large: %u bytes", data_length);
+                LOG_VERBOSE(VERBOSITY_2, WARN, "Capture: Received CSI payload too large: %u bytes", data_length);
                 return NL_SKIP;
             }
 
@@ -258,6 +268,7 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
             
             memcpy(current_csi_data.csi_data, data, data_length);
 
+            current_csi_metadata.header.timestamp = vespercsi_csi_wallclock_us();
             current_csi_metadata.num_rx = current_csi_metadata.header.num_rx;
             current_csi_metadata.num_tx = current_csi_metadata.header.num_tx;
             current_csi_metadata.num_subcarriers = current_csi_metadata.header.num_subcarriers;
@@ -302,8 +313,6 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
                 counter++;
             }
 
-            current_csi_metadata.header.timestamp = vespercsi_csi_wallclock_us();
-
             vespercsi_csi_t csi = {
                 current_csi_metadata.header,
                 current_csi_data
@@ -318,6 +327,11 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
             
             if(status == VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_SUCCESS){
                 atomic_store_explicit(&vespercsi_capture_dirty_flag, 1, memory_order_release);
+            }else if(status == VESPERCSI_CSI_RINGBUFFER_LISTPOOL_STATUS_NO_MEMORY && vespercsi_options.ring_buffer_instant_death){
+                // Buffer full while trying to push, instant death!
+                // Use this only for debugging
+                LOG(FAIL, "Capture: Ring buffer full while trying to push (Instant Death)");                
+                exit(EXIT_FAILURE);                      
             }
 
             atomic_flag_clear_explicit(&vespercsi_csi_ringbuffer_lock, memory_order_release);

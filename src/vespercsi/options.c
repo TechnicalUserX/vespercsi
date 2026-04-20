@@ -48,7 +48,8 @@ void vespercsi_options_parse(int argc, char* argv[]){
        { "config-file",    required_argument,  NULL,   'c'},
        { "unrestricted",   no_argument,        NULL,   'u'},      
        { "daemon",         no_argument,        NULL,   'd'},       
-       { "netlink-buffer-instant-death",    no_argument,    NULL,1001},       
+       { "netlink-buffer-instant-death",     no_argument,   NULL,1001},
+       { "ring-buffer-instant-death",        no_argument,   NULL,1002},       
        { NULL,             0,                  NULL,   0  }   
     };
 
@@ -134,7 +135,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
             case 900:{
                 int n = atoi(optarg);
                 if(n < 1 || n > 2){
-                    printf("VesperCSI: Bad RX count");
+                    printf("VesperCSI: Bad RX count\n");
                     exit(EXIT_FAILURE);
                 }
                 vespercsi_options.num_rx = n;
@@ -143,7 +144,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
             case 901:{
                 int n = atoi(optarg);
                 if(n < 1 || n > 2){
-                    printf("VesperCSI: Bad TX count");
+                    printf("VesperCSI: Bad TX count\n");
                     exit(EXIT_FAILURE);
                 }
                 vespercsi_options.num_tx = n;
@@ -215,6 +216,10 @@ void vespercsi_options_parse(int argc, char* argv[]){
 
             case 1001:{
                 vespercsi_options.netlink_buffer_instant_death = true;
+            }break;
+
+            case 1002:{
+                vespercsi_options.ring_buffer_instant_death = true;
             }break;
         }
     

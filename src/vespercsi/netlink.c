@@ -137,10 +137,7 @@ int vespercsi_netlink_execute(vespercsi_netlink_t* netlink, vespercsi_netlink_co
             if (recv_err < 0) {
                 if(vespercsi_options.netlink_buffer_instant_death){
                     LOG(FAIL, "Netlink: nl_recvmsgs() returned %d (Instant Death)", recv_err);
-                    nl_cb_put(cb);
-                    nl_cb_put(s_cb);
-                    nlmsg_free(msg);  
-                    return VESPERCSI_FAIL;                   
+                    exit(EXIT_FAILURE);                   
                 }else{
                     LOG_VERBOSE(VERBOSITY_2, WARN, "Netlink: nl_recvmsgs() returned %d: %s", recv_err, strerror(nl_syserr2nlerr(recv_err)));
                 }
