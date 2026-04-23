@@ -1,5 +1,5 @@
 #!/bin/bash
-# Configuration script for C/C++ (c) 2024-2025 Kaan Baydemir
+# Configuration script for C/C++ (c) 2024-2026 TechnicalUserX (Kaan Baydemir)
 # Out-of-source build is adopted
 
 # shellcheck disable=SC2034

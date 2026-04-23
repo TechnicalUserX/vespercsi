@@ -7,6 +7,9 @@
 #include <stdbool.h>
 #include <dlfcn.h>
 #include <string.h>
+#include <libgen.h>
+
+#define VESPERCSI_PLUGIN_FOLDER "/etc/vespercsi/plugins"
 
 #define VESPERCSI_PLUGIN_SDK_VERSION 1
 
@@ -18,9 +21,15 @@ typedef struct vespercsi_plugin_log_t{
     uint8_t verbosity;
 }vespercsi_plugin_log_t;
 
+typedef struct vespercsi_plugin_config_t{
+    bool set;
+    char path[512];
+}vespercsi_plugin_config_t;
+
 typedef struct vespercsi_plugin_context_t{
     uint64_t sdk_version;
-     vespercsi_plugin_log_t log;
+    vespercsi_plugin_log_t log;
+    vespercsi_plugin_config_t config;
 }vespercsi_plugin_context_t;
 
 
@@ -32,6 +41,7 @@ typedef void (*vespercsi_plugin_function_destroy_t)(void);
 typedef struct vespercsi_plugin_t {
     bool set;
     char path[512];
+    char config_path[512];
     void*                                   handle;      // dlopen handle
     vespercsi_plugin_function_callback_t    callback;
     vespercsi_plugin_function_init_t        init;

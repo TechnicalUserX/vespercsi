@@ -35,18 +35,19 @@ void vespercsi_options_parse(int argc, char* argv[]){
         { "help",           no_argument,        NULL,   'h'},    
         { "interface-mac",  required_argument,  NULL,   'i'},
         { "frequency",      required_argument,  NULL,   'f'},
-        { "format",         required_argument,  NULL,   't'},
+        { "format",         required_argument,  NULL,   'F'},
         { "channel-width",  required_argument,  NULL,   'w'},
-        { "num-rx",         required_argument,  NULL,   900},
-        { "num-tx",         required_argument,  NULL,   901},
+        { "num-rx",         required_argument,  NULL,   'r'},
+        { "num-tx",         required_argument,  NULL,   't'},
         { "plugin",         required_argument,  NULL,   'p'},
+        { "plugin-config",  required_argument,  NULL,   'P'},
         { "verbose",        optional_argument,  NULL,   'v'},
         { "version",        no_argument,        NULL,   1000},
-        { "log-file",       required_argument,  NULL,   'l'},
-        { "out-file",       required_argument,  NULL,   'o'}, 
+        { "log",       required_argument,  NULL,   'l'},
+        { "out",       required_argument,  NULL,   'o'}, 
        { "quiet",          no_argument,        NULL,   'q'},
        { "src-mac",        required_argument,  NULL,   's'},
-       { "config-file",    required_argument,  NULL,   'c'},
+       { "config",    required_argument,  NULL,   'c'},
        { "unrestricted",   no_argument,        NULL,   'u'},      
        { "daemon",         no_argument,        NULL,   'd'},       
        { "netlink-buffer-instant-death",     no_argument,   NULL,1001},
@@ -57,7 +58,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
     optind = 0;
     int opt = 0;
     
-    while((opt = getopt_long(argc, argv, ":vhi:f:t:w:l:o:qp:s:c:ud",long_options,NULL)) != -1){
+    while((opt = getopt_long(argc, argv, ":vhi:F:t:r:w:l:o:qp:s:c:ud",long_options,NULL)) != -1){
 
         switch(opt){
     
@@ -133,7 +134,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
                 vespercsi_options.channel_width = vespercsi_wifi_channel_mode_to_width(&mode);
             }break;
 
-            case 900:{
+            case 'r':{
                 int n = atoi(optarg);
                 if(n < 1 || n > 2){
                     printf("VesperCSI: Bad RX count\n");
@@ -142,13 +143,17 @@ void vespercsi_options_parse(int argc, char* argv[]){
                 vespercsi_options.num_rx = n;
             }break;
 
-            case 901:{
+            case 't':{
                 int n = atoi(optarg);
                 if(n < 1 || n > 2){
                     printf("VesperCSI: Bad TX count\n");
                     exit(EXIT_FAILURE);
                 }
                 vespercsi_options.num_tx = n;
+            }break;
+
+            case 'P':{
+                strncpy(vespercsi_plugin.config_path, optarg, sizeof(vespercsi_plugin.config_path)-1);
             }break;
 
             case 'p':{
@@ -182,7 +187,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
 
             }break;
 
-            case 't':{
+            case 'F':{
                 if(strcmp(optarg, "NOHT") == 0){
                     strcpy(vespercsi_options.format, "NOHT");
                 }else if(strcmp(optarg, "HT") == 0){

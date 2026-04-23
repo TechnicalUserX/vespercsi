@@ -11,6 +11,4 @@ mainmenu "VesperCSI Configuration Mainmenu"
             prompt "Value"
             string
 
-
-
     endmenu

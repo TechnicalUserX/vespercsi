@@ -108,9 +108,15 @@ typedef struct vespercsi_plugin_log_t{
     uint8_t verbosity;
 }vespercsi_plugin_log_t;
 
+typedef struct vespercsi_plugin_config_t{
+    bool set;
+    char path[512];
+}vespercsi_plugin_config_t;
+
 typedef struct vespercsi_plugin_context_t{
     uint64_t sdk_version;
      vespercsi_plugin_log_t log;
+     vespercsi_plugin_config_t config;
 }vespercsi_plugin_context_t;
 
 extern vespercsi_plugin_context_t vespercsi_plugin_context;

@@ -165,14 +165,10 @@ ${BUILD_BIN_DIR}/vespercsi: ${VESPERCSI_OBJ}
 vespercsi-install: superuser
 	@$(call build_log, "Installing...")
 	@install --target-directory ${DESTDIR}${PREFIX}/bin ${BUILD_BIN_DIR}/vespercsi
-
 vespercsi-uninstall: superuser
 	@$(call build_log, "Uninstalling...")
 	@rm -f ${DESTDIR}${PREFIX}/bin/vespercsi
 
-vespercsi-update: superuser
-	@${MAKE} --no-print-directory vespercsi-uninstall
-	@${MAKE} --no-print-directory vespercsi-install
 
 # Plugins
 
@@ -181,23 +177,54 @@ vespercsi-update: superuser
 udp-send: ${BUILD_BIN_DIR}/udp_send.vesper
 udp-send: CFLAGS=-I"${ROOT_DIR}/include" -fPIC
 udp-send: LDFLAGS=-shared
+
 ${BUILD_BIN_DIR}/udp_send.vesper: ${UDP_SEND_OBJ}
 	@$(call build_log, ${CC} <objects> -o $@)
 	@${CC} $^ ${LDFLAGS} -o $@
 	@echo Build Successful
 
+udp-send-install: superuser
+	@$(call build_log, "Installing...")
+	@${MKDIR_P} ${DESTDIR}${PREFIX}/etc/vespercsi/plugins
+	@install --target-directory ${DESTDIR}${PREFIX}/etc/vespercsi/plugins ${BUILD_BIN_DIR}/udp_send.vesper
+
+udp-send-uninstall: superuser
+	@$(call build_log, "Uninstalling...")
+	@rm -f ${DESTDIR}${PREFIX}/etc/vespercsi/plugins/udp_send.vesper
+
+
 print-details: ${BUILD_BIN_DIR}/print_details.vesper
 print-details: CFLAGS=-I"${ROOT_DIR}/include" -fPIC
 print-details: LDFLAGS=-shared
+
 ${BUILD_BIN_DIR}/print_details.vesper: ${PRINT_DETAILS_OBJ}
 	@$(call build_log, ${CC} <objects> -o $@)
 	@${CC} $^ ${LDFLAGS} -o $@
 	@echo Build Successful
 
+print-details-install: superuser
+	@$(call build_log, "Installing...")
+	@${MKDIR_P} ${DESTDIR}${PREFIX}/etc/vespercsi/plugins
+	@install --target-directory ${DESTDIR}${PREFIX}/etc/vespercsi/plugins ${BUILD_BIN_DIR}/print_details.vesper
+
+print-details-uninstall: superuser
+	@$(call build_log, "Uninstalling...")
+	@rm -f ${DESTDIR}${PREFIX}/etc/vespercsi/plugins/print_details.vesper
+
 packet-checker: ${BUILD_BIN_DIR}/packet_checker.vesper
 packet-checker: CFLAGS=-I"${ROOT_DIR}/include" -fPIC
 packet-checker: LDFLAGS=-shared
+
 ${BUILD_BIN_DIR}/packet_checker.vesper: ${PACKET_CHECKER_OBJ}
 	@$(call build_log, ${CC} <objects> -o $@)
 	@${CC} $^ ${LDFLAGS} -o $@
 	@echo Build Successful
+
+packet-checker-install: superuser
+	@$(call build_log, "Installing...")
+	@${MKDIR_P} ${DESTDIR}${PREFIX}/etc/vespercsi/plugins
+	@install --target-directory ${DESTDIR}${PREFIX}/etc/vespercsi/plugins ${BUILD_BIN_DIR}/packet_checker.vesper
+
+packet-checker-uninstall: superuser
+	@$(call build_log, "Uninstalling...")
+	@rm -f ${DESTDIR}${PREFIX}/etc/vespercsi/plugins/packet_checker.vesper

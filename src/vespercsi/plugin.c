@@ -1,7 +1,6 @@
 #include <vespercsi/plugin.h>
 #include <vespercsi/config.h>
 
-
 vespercsi_plugin_t vespercsi_plugin = {0};
 
 void vespercsi_plugin_load(void){
@@ -11,10 +10,25 @@ void vespercsi_plugin_load(void){
 
     // RTLD_NOW  — resolve all symbols immediately, fail fast if missing
     // RTLD_LOCAL — don't pollute global symbol namespace
-    void* handle = dlopen(vespercsi_plugin.path, RTLD_NOW | RTLD_LOCAL);
-    if (!handle) {
-        fprintf(stdout, "VesperCSI: Plugin load failed: %s", dlerror());
-        exit(EXIT_FAILURE);
+    void* handle = NULL;
+
+    
+    if(strcmp(dirname(vespercsi_plugin.path), ".") == 0 && strstr(vespercsi_plugin.path, "/") == NULL){
+        // Search under /etc/vespercsi/plugins
+        char search_path[512] = VESPERCSI_PLUGIN_FOLDER;
+        strncat(search_path, vespercsi_plugin.path, sizeof(search_path)-1-sizeof(VESPERCSI_PLUGIN_FOLDER));
+        handle = dlopen(search_path, RTLD_NOW | RTLD_LOCAL);
+        if (!handle) {
+            fprintf(stdout, "VesperCSI: Plugin load failed: %s", dlerror());
+            exit(EXIT_FAILURE);
+        }
+    }else{
+        // Absolute path
+        handle = dlopen(vespercsi_plugin.path, RTLD_NOW | RTLD_LOCAL);
+        if (!handle) {
+            fprintf(stdout, "VesperCSI: Plugin load failed: %s", dlerror());
+            exit(EXIT_FAILURE);
+        }
     }
 
     // Clear any existing dlerror
@@ -55,17 +69,20 @@ void vespercsi_plugin_load(void){
     vespercsi_plugin.destroy = destroy;
     vespercsi_plugin.loaded  = true;
 
-    // Call init if the plugin provided one
-    if (vespercsi_plugin.init){
-        vespercsi_plugin_context_t new_context = {
-            .sdk_version = VESPERCSI_PLUGIN_SDK_VERSION,
-            .log.function = vespercsi_log,
-            .log.verbose = vespercsi_options.verbose,
-            .log.verbosity = vespercsi_options.verbosity
-        };
+    // Call init
+    vespercsi_plugin_context_t new_context = {
+        .sdk_version = VESPERCSI_PLUGIN_SDK_VERSION,
+        .log.function = vespercsi_log,
+        .log.verbose = vespercsi_options.verbose,
+        .log.verbosity = vespercsi_options.verbosity
+    };
 
-        vespercsi_plugin.init(&new_context);
+    if(strcmp(vespercsi_plugin.config_path, "") != 0){
+        strncpy(new_context.config.path, vespercsi_plugin.config_path, sizeof(new_context.config.path) - 1);
+        new_context.config.set = true;
     }
+
+    vespercsi_plugin.init(&new_context);
 
     vespercsi_plugin.loaded = true;
     return;

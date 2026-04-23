@@ -26,16 +26,17 @@ void vespercsi_plugin_function_init(vespercsi_plugin_context_t* context) {
     int port = 5555;
 
     // Read the libconfig file
-    if (!config_read_file(&cfg, "/etc/vespercsi/plugins/udp_send.conf")) {
-        LOG(WARN, "udp_send: Could not read /etc/vespercsi/plugins/udp_send.conf. Using default %s:%d. Reason: %s at line %d", 
-            ip, port, config_error_text(&cfg), config_error_line(&cfg));
-    } else {
-        // Read values if they exist in the file
+    if(!context->config.set){ 
+        LOG(WARN, "udp_send: No configuration file set, proceeding with default values 127.0.0.1:5555");
+    }else if(config_read_file(&cfg, context->config.path)){
         config_lookup_string(&cfg, "ip", &ip);
         config_lookup_int(&cfg, "port", &port);
         LOG(INFO, "udp_send: Loaded config - IP: %s, Port: %d", ip, port);
-    }
-
+    }else{
+        LOG(WARN, "udp_send: Could not read %s. Using default %s:%d. Reason: %s at line %d", context->config.path,
+            ip, port, config_error_text(&cfg), config_error_line(&cfg));
+    } 
+    
     // Setup UDP socket
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
