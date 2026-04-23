@@ -1,0 +1,16 @@
+mainmenu "VesperCSI Configuration Mainmenu"
+
+    config VESPERTEST
+        prompt "Vesper Test"
+        bool
+
+    menu "Vesper Test"
+        visible if VESPERTEST
+
+        config VESPERTEST_VALUE
+            prompt "Value"
+            string
+
+
+
+    endmenu

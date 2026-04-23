@@ -1,3 +1,6 @@
+If:
+    PathMatch: src/*.*
+
 CompileFlags:
     Add:
         - -I/home/tux/VesperCSI/vespercsi/src
@@ -6,3 +9,12 @@ CompileFlags:
         - -I/home/tux/VesperCSI/vesperos/output/host/aarch64-buildroot-linux-gnu/sysroot/usr/include/libnl3
         - -I/home/tux/VesperCSI/vespercsi/build/include
     Compiler: clang
+
+---
+
+If:
+    PathMatch: plugins/*.*
+    
+CompileFlags:
+    Add:
+        - -I/home/tux/VesperCSI/vespercsi/include

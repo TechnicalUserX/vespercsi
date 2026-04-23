@@ -3,10 +3,10 @@
 
 #include <vespercsi/vespercsi.h>
 #include <vespercsi/csi.h>
+#include <vespercsi/log.h>
 #include <stdbool.h>
 #include <dlfcn.h>
 #include <string.h>
-#include <vespercsi/log.h>
 
 #define VESPERCSI_PLUGIN_SDK_VERSION 1
 

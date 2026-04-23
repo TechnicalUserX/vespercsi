@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 // ================================================================
 // VesperCSI Plugin SDK
@@ -94,6 +95,10 @@ typedef enum vespercsi_log_level_t {
 #define INFO VESPERCSI_LOG_LEVEL_INFO
 #define PASS VESPERCSI_LOG_LEVEL_PASS
 #define DEBG VESPERCSI_LOG_LEVEL_DEBG
+
+#define VERBOSITY_0 0
+#define VERBOSITY_1 1
+#define VERBOSITY_2 2
 
 typedef void (*vespercsi_plugin_function_log_t)(vespercsi_log_level_t level, const char* format, ...);
 
