@@ -1,10 +1,6 @@
 #ifndef VESPERCSI_CSI_H
 #define VESPERCSI_CSI_H
 
-#ifndef _GNU_SOURCE
-    #define _GNU_SOURCE
-#endif
-
 #include <vespercsi/vespercsi.h>
 #include <vespercsi/listpool.h>
 #include <stdint.h>
@@ -30,15 +26,37 @@
 #include <string.h>
 #include <sys/uio.h>
 
-#define VESPERCSI_CSI_SUPPORTED_TX_MAX 2
-#define VESPERCSI_CSI_SUPPORTED_RX_MAX 2
-#define VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX 244
+#ifdef CONFIG_VESPERCSI_CSI_SUPPORTED_TX_MAX
+    #define VESPERCSI_CSI_SUPPORTED_TX_MAX CONFIG_VESPERCSI_CSI_SUPPORTED_TX_MAX
+#else
+    #define VESPERCSI_CSI_SUPPORTED_TX_MAX 2
+#endif
 
+#ifdef CONFIG_VESPERCSI_CSI_SUPPORTED_RX_MAX
+    #define VESPERCSI_CSI_SUPPORTED_RX_MAX CONFIG_VESPERCSI_CSI_SUPPORTED_RX_MAX
+#else
+    #define VESPERCSI_CSI_SUPPORTED_RX_MAX 2
+#endif
+
+#ifdef CONFIG_VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX
+    #define VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX CONFIG_VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX
+#else
+    #define VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX 244
+#endif
 // The max time difference between newest and oldest csi data in seconds
-#define VESPERCSI_CSI_SUPPORTED_TIME_FRAME_MAX 10
+#ifdef CONFIG_VESPERCSI_CSI_SUPPORTED_TIME_FRAME_MAX
+    #define VESPERCSI_CSI_SUPPORTED_TIME_FRAME_MAX CONFIG_VESPERCSI_CSI_SUPPORTED_TIME_FRAME_MAX
+#else
+    #define VESPERCSI_CSI_SUPPORTED_TIME_FRAME_MAX 10
+#endif
 
 // The number of CSI data arriving in a second
-#define VESPERCSI_CSI_SUPPORTED_RATE_MAX 1000
+
+#ifdef CONFIG_VESPERCSI_CSI_SUPPORTED_RATE_MAX
+    #define VESPERCSI_CSI_SUPPORTED_RATE_MAX CONFIG_VESPERCSI_CSI_SUPPORTED_RATE_MAX
+#else
+    #define VESPERCSI_CSI_SUPPORTED_RATE_MAX 1000
+#endif
 
 #define VESPERCSI_CSI_HEADER_LENGTH 272
 
@@ -47,9 +65,6 @@
 #define VESPERCSI_CSI_DATA_SIZE_MAX VESPERCSI_CSI_DATA_BYTE_SIZE(VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX, VESPERCSI_CSI_SUPPORTED_TX_MAX, VESPERCSI_CSI_SUPPORTED_RX_MAX)
 
 #define VESPERCSI_CSI_SIZE_MAX (VESPERCSI_CSI_HEADER_LENGTH + VESPERCSI_CSI_DATA_SIZE_MAX)
-
-#define VESPERCSI_CSI_BATCH_FLUSH_SIZE 50
-#define VESPERCSI_CSI_BATCH_FLUSH_INTERVAL 50000
 
 #define IWL_MVM_VENDOR_ATTR_CSI_HDR 0x4d
 #define IWL_MVM_VENDOR_ATTR_CSI_DATA 0x4e
@@ -83,7 +98,7 @@ typedef struct __attribute__((__packed__)) vespercsi_csi_metadata_t{
     uint32_t channel_width;
 }vespercsi_csi_metadata_t;
 
-typedef struct __attribute__((aligned(4096))) vespercsi_csi_data_t{
+typedef struct __attribute__((__packed__)) vespercsi_csi_data_t{
     uint8_t csi_data[VESPERCSI_CSI_DATA_SIZE_MAX];
 }vespercsi_csi_data_t;
 

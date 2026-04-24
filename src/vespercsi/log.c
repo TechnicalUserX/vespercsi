@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
+bool vespercsi_log_verbose = false;
+int vespercsi_log_verbosity = 0;
+
 FILE* vespercsi_log_file = NULL;
 
 void vespercsi_log_init(void) {
@@ -27,7 +30,6 @@ void vespercsi_log_destroy(void){
         fclose(vespercsi_log_file);
     }
 }
-
 
 void vespercsi_log(vespercsi_log_level_t log_level, const char* format, ...) {
     va_list vl;

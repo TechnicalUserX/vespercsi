@@ -2,7 +2,6 @@
 #define VESPERCSI_OPTIONS_H
 
 #include <vespercsi/vespercsi.h>
-#include <vespercsi/version.h>
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>

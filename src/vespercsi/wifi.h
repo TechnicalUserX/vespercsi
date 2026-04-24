@@ -2,10 +2,10 @@
 #define VESPERCSI_WIFI_H
 
 #include <vespercsi/vespercsi.h>
+#include <vespercsi/netlink.h>
 #include <linux/netlink.h>
 #include <netlink/msg.h>
 #include <linux/nl80211.h>
-#include <vespercsi/netlink.h>
 #include <net/if.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -15,14 +15,27 @@
 #include <signal.h>
 
 
-#define VESPERCSI_WIFI_INTERFACE_MAX_SIZE 20
-#define VESPERCSI_WIFI_PHY_MAX_SIZE 10
+#ifdef CONFIG_VESPERCSI_WIFI_INTERFACE_MAX_SIZE
+    #define VESPERCSI_WIFI_INTERFACE_MAX_SIZE CONFIG_VESPERCSI_WIFI_INTERFACE_MAX_SIZE
+#else
+    #define VESPERCSI_WIFI_INTERFACE_MAX_SIZE 10
+#endif
 
-#define VESPERCSI_WIFI_INTERFACE_NAME_STR_SIZE 64
+#ifdef CONFIG_VESPERCSI_WIFI_PHY_MAX_SIZE
+    #define VESPERCSI_WIFI_PHY_MAX_SIZE CONFIG_VESPERCSI_WIFI_PHY_MAX_SIZE
+#else
+    #define VESPERCSI_WIFI_PHY_MAX_SIZE 10
+#endif
+
+#ifdef CONFIG_VESPERCSI_WIFI_INTERFACE_NAME
+    #define VESPERCSI_WIFI_INTERFACE_NAME CONFIG_VESPERCSI_WIFI_INTERFACE_NAME
+#else
+    #define VESPERCSI_WIFI_INTERFACE_NAME "vespercsimon"
+#endif
+
 #define VESPERCSI_WIFI_PHY_NAME_STR_SIZE 32
+#define VESPERCSI_WIFI_INTERFACE_NAME_STR_SIZE 64
 #define VESPERCSI_WIFI_MAC_STR_SIZE 18
-
-#define VESPERCSI_WIFI_MONITOR_INTERFACE "vespercsimon"
 
 extern char vespercsi_wifi_original_interface[IFNAMSIZ];
 

@@ -36,7 +36,10 @@ typedef enum vespercsi_log_level_t{
 
 #define LOG(level, format, ...) {vespercsi_log(level, format, ##__VA_ARGS__);}
 
-#define LOG_VERBOSE(verbosity_index, level, format, ...) if(vespercsi_options.verbose && verbosity_index <= vespercsi_options.verbosity){vespercsi_log(level, format, ##__VA_ARGS__);}
+extern bool vespercsi_log_verbose;
+extern int vespercsi_log_verbosity;
+
+#define LOG_VERBOSE(verbosity_index, level, format, ...) if(vespercsi_log_verbose && verbosity_index <= vespercsi_log_verbosity){vespercsi_log(level, format, ##__VA_ARGS__);}
 
 extern FILE* vespercsi_log_file;
 

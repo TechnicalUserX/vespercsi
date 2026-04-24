@@ -61,12 +61,14 @@ IS_SUPERUSER = $(shell [ `id -u` -eq 0 ] && echo 1 || echo 0)
 ########################################
 # Compiler, Preprocessor, Linker
 
-CC := @CC@
-CXX := @CXX@
-CFLAGS := @CFLAGS@
-CXXFLAGS := @CXXFLAGS@
-CPPFLAGS := @CPPFLAGS@
-LDFLAGS := @LDFLAGS@
+-include ${BUILD_DIR}/.config
+
+CC := $(if $(subst ",,${CONFIG_COMPILER_GLOBAL_CC}),$(subst ",,${CONFIG_COMPILER_GLOBAL_CC}),@CC@) 
+CXX := $(if $(subst ",,${CONFIG_COMPILER_GLOBAL_CXX}),$(subst ",,${CONFIG_COMPILER_GLOBAL_CXX}),@CXX@) 
+CFLAGS := $(if $(subst ",,${CONFIG_COMPILER_GLOBAL_CFLAGS}),$(subst ",,${CONFIG_COMPILER_GLOBAL_CFLAGS}),@CFLAGS@) 
+CXXFLAGS := $(if $(subst ",,${CONFIG_COMPILER_GLOBAL_CXXFLAGS}),$(subst ",,${CONFIG_COMPILER_GLOBAL_CXXFLAGS}),@CXXFLAGS@) 
+CPPFLAGS := $(if $(subst ",,${CONFIG_COMPILER_GLOBAL_CPPFLAGS}),$(subst ",,${CONFIG_COMPILER_GLOBAL_CPPFLAGS}),@CPPFLAGS@) 
+LDFLAGS := $(if $(subst ",,${CONFIG_COMPILER_GLOBAL_LDFLAGS}),$(subst ",,${CONFIG_COMPILER_GLOBAL_LDFLAGS}),@LDFLAGS@) 
 
 ########################################
 # Menuconfig
@@ -83,7 +85,6 @@ MENUCONFIG_AUTOCONF_PATH = ${BUILD_HDR_DIR}/vespercsi/autoconf.h
 all: ${TARGETS}
 
 -include ${BUILD_DIR}/sources.mk
--include ${BUILD_DIR}/configs.mk
 
 install: ${TARGETS_INSTALL}
 
@@ -136,8 +137,6 @@ menuconfig:
 		echo "${ROOT_DIR}/Kconfig not found"; \
 	fi
 
-
-
 ########################################
 # Definitions
 
@@ -171,8 +170,6 @@ vespercsi-uninstall: superuser
 
 
 # Plugins
-
-.PHONY: udp-send print-details packet-checker
 
 udp-send: ${BUILD_BIN_DIR}/udp_send.vesper
 udp-send: CFLAGS=-I"${ROOT_DIR}/include" -fPIC

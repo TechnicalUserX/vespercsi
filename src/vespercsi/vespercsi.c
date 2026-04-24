@@ -92,22 +92,22 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     }
 
-    LOG_VERBOSE(VERBOSITY_0,INFO, "Adding %s", VESPERCSI_WIFI_MONITOR_INTERFACE);
+    LOG_VERBOSE(VERBOSITY_0,INFO, "Adding %s", VESPERCSI_WIFI_INTERFACE_NAME);
     
-    vespercsi_wifi_add_device(&vespercsi_wifi_controller, VESPERCSI_WIFI_MONITOR_INTERFACE, phy->index, NL80211_IFTYPE_MONITOR);
+    vespercsi_wifi_add_device(&vespercsi_wifi_controller, VESPERCSI_WIFI_INTERFACE_NAME, phy->index, NL80211_IFTYPE_MONITOR);
     usleep(100);
 
     vespercsi_wifi_interface_t current_interface = {0};
 
     do{
-        vespercsi_wifi_set_interface_updown(VESPERCSI_WIFI_MONITOR_INTERFACE, true);
-        vespercsi_wifi_set_interface_frequency(&vespercsi_wifi_controller, VESPERCSI_WIFI_MONITOR_INTERFACE, vespercsi_options.frequency, vespercsi_options.bandwidth);
-        vespercsi_wifi_get_single_interface(&vespercsi_wifi_controller, &current_interface, VESPERCSI_WIFI_MONITOR_INTERFACE);
+        vespercsi_wifi_set_interface_updown(VESPERCSI_WIFI_INTERFACE_NAME, true);
+        vespercsi_wifi_set_interface_frequency(&vespercsi_wifi_controller, VESPERCSI_WIFI_INTERFACE_NAME, vespercsi_options.frequency, vespercsi_options.bandwidth);
+        vespercsi_wifi_get_single_interface(&vespercsi_wifi_controller, &current_interface, VESPERCSI_WIFI_INTERFACE_NAME);
         usleep(1000);
     }while(current_interface.freq != vespercsi_options.frequency);
 
     if(vespercsi_wifi_toggle_iwlwifi(true) == VESPERCSI_FAIL){
-        LOG(FAIL, "Cannot enable CSI capturing on the interface %s", VESPERCSI_WIFI_MONITOR_INTERFACE);
+        LOG(FAIL, "Cannot enable CSI capturing on the interface %s", VESPERCSI_WIFI_INTERFACE_NAME);
         exit(EXIT_FAILURE);
     }
 
@@ -145,7 +145,7 @@ int main(int argc, char* argv[]){
     //==========================================================//
     
     if(vespercsi_wifi_toggle_iwlwifi(false) == VESPERCSI_FAIL){
-        LOG(WARN, "Cannot disable CSI capturing on the interface %s", VESPERCSI_WIFI_MONITOR_INTERFACE);
+        LOG(WARN, "Cannot disable CSI capturing on the interface %s", VESPERCSI_WIFI_INTERFACE_NAME);
     }
 
     vespercsi_csi_capture_stop();
@@ -157,11 +157,11 @@ int main(int argc, char* argv[]){
     //==========================================================//
     //=================== Interface Revert =====================//
 
-    vespercsi_wifi_remove_interface(&vespercsi_wifi_controller, VESPERCSI_WIFI_MONITOR_INTERFACE, 0);
+    vespercsi_wifi_remove_interface(&vespercsi_wifi_controller, VESPERCSI_WIFI_INTERFACE_NAME, 0);
 
     if(strcmp(vespercsi_wifi_original_interface, "") != 0){
 
-        LOG_VERBOSE(VERBOSITY_1, INFO, "Reverting %s to %s", VESPERCSI_WIFI_MONITOR_INTERFACE, vespercsi_wifi_original_interface);
+        LOG_VERBOSE(VERBOSITY_1, INFO, "Reverting %s to %s", VESPERCSI_WIFI_INTERFACE_NAME, vespercsi_wifi_original_interface);
 
         // Best effort
         vespercsi_wifi_add_device(&vespercsi_wifi_controller, vespercsi_wifi_original_interface, phy->index, NL80211_IFTYPE_STATION);

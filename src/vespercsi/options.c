@@ -2,6 +2,8 @@
 #include <vespercsi/options.h>
 #include <vespercsi/log.h>
 #include <vespercsi/plugin.h>
+#include <vespercsi/debug.h>
+#include <vespercsi/version.h>
 
 
 // Global Options Struct
@@ -42,7 +44,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
         { "plugin",         required_argument,  NULL,   'p'},
         { "plugin-config",  required_argument,  NULL,   'P'},
         { "verbose",        optional_argument,  NULL,   'v'},
-        { "version",        no_argument,        NULL,   1000},
+        { "version",       no_argument,        NULL,   1000},
         { "log",       required_argument,  NULL,   'l'},
         { "out",       required_argument,  NULL,   'o'}, 
        { "quiet",          no_argument,        NULL,   'q'},
@@ -52,6 +54,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
        { "daemon",         no_argument,        NULL,   'd'},       
        { "netlink-buffer-instant-death",     no_argument,   NULL,1001},
        { "ring-buffer-instant-death",        no_argument,   NULL,1002},       
+        { "debug-constants",         no_argument,        NULL,   1003},
        { NULL,             0,                  NULL,   0  }   
     };
 
@@ -71,6 +74,7 @@ void vespercsi_options_parse(int argc, char* argv[]){
             case 'v':{
                 vespercsi_options.verbose = true;
                 vespercsi_options.quiet = false;
+                vespercsi_log_verbose = true;
                 
                 if(optarg){
                     int verbosity = atoi(optarg);
@@ -79,7 +83,9 @@ void vespercsi_options_parse(int argc, char* argv[]){
                         exit(EXIT_FAILURE);                    
                     }
                     vespercsi_options.verbosity = verbosity;
+                    vespercsi_log_verbosity = verbosity;
                 }
+
 
             }break;
 
@@ -226,6 +232,11 @@ void vespercsi_options_parse(int argc, char* argv[]){
 
             case 1002:{
                 vespercsi_options.ring_buffer_instant_death = true;
+            }break;
+
+            case 1003:{
+                vespercsi_debug_constants();
+                exit(EXIT_SUCCESS);
             }break;
         }
     

@@ -9,7 +9,11 @@
 #include <string.h>
 #include <libgen.h>
 
-#define VESPERCSI_PLUGIN_FOLDER "/etc/vespercsi/plugins"
+#ifdef CONFIG_VESPERCSI_PLUGIN_FOLDER
+    #define VESPERCSI_PLUGIN_FOLDER CONFIG_VESPERCSI_PLUGIN_FOLDER
+#else
+    #define VESPERCSI_PLUGIN_FOLDER "/etc/vespercsi/plugins"
+#endif
 
 #define VESPERCSI_PLUGIN_SDK_VERSION 1
 
@@ -51,7 +55,7 @@ typedef struct vespercsi_plugin_t {
 
 extern vespercsi_plugin_t vespercsi_plugin;
 
-void  vespercsi_plugin_load(void);
+void vespercsi_plugin_load(void);
 void vespercsi_plugin_unload(void);
 
 #endif

@@ -572,7 +572,6 @@ function config_builddir_sanity_check(){
 function config_builddir_clean(){
     # Clean well-known files and directories
     rm -f "${BUILD_DIR:?}/makefile"
-    rm -f "${BUILD_DIR:?}/configs.mk"
     rm -f "${BUILD_DIR:?}/sources.mk"
     rm -f "${BUILD_DIR:?}/makefile.mk"
     rm -f "${BUILD_DIR:?}/config.log"

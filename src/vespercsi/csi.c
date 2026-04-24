@@ -197,7 +197,7 @@ int vespercsi_csi_listen(vespercsi_csi_controller_t* controller){
         .id = NL80211_CMD_VENDOR,
         .idby = VESPERCSI_NETLINK_CIB_NETDEV,
         .nlFlags = 0,
-        .device = if_nametoindex(VESPERCSI_WIFI_MONITOR_INTERFACE),
+        .device = if_nametoindex(VESPERCSI_WIFI_INTERFACE_NAME),
         .handler = vespercsi_csi_listen_handler,
         .valid_handler = vespercsi_csi_capture_handler,
     };
