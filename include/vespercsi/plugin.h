@@ -22,10 +22,26 @@
 // These are the only VesperCSI internals the plugin needs to know
 // ================================================================
 
+
+#ifdef CONFIG_VESPERCSI_CSI_SUPPORTED_TX_MAX
+    #define VESPERCSI_CSI_SUPPORTED_TX_MAX CONFIG_VESPERCSI_CSI_SUPPORTED_TX_MAX
+#else
+    #define VESPERCSI_CSI_SUPPORTED_TX_MAX 2
+#endif
+
+#ifdef CONFIG_VESPERCSI_CSI_SUPPORTED_RX_MAX
+    #define VESPERCSI_CSI_SUPPORTED_RX_MAX CONFIG_VESPERCSI_CSI_SUPPORTED_RX_MAX
+#else
+    #define VESPERCSI_CSI_SUPPORTED_RX_MAX 2
+#endif
+
+#ifdef CONFIG_VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX
+    #define VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX CONFIG_VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX
+#else
+    #define VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX 244
+#endif
+
 #define VESPERCSI_CSI_HEADER_LENGTH         272
-#define VESPERCSI_CSI_SUPPORTED_TX_MAX      2
-#define VESPERCSI_CSI_SUPPORTED_RX_MAX      2
-#define VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX 244
 #define VESPERCSI_CSI_DATA_SIZE_MAX         (16 * VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX * VESPERCSI_CSI_SUPPORTED_TX_MAX * VESPERCSI_CSI_SUPPORTED_RX_MAX)
 #define VESPERCSI_CSI_SIZE_MAX              (VESPERCSI_CSI_HEADER_LENGTH + VESPERCSI_CSI_DATA_SIZE_MAX)
 
@@ -33,7 +49,7 @@ typedef struct __attribute__((__packed__)) vespercsi_csi_header_t {
     uint32_t csi_data_size;
     uint32_t space4;
     uint32_t ftm_clock;
-    uint64_t timestamp;         // microseconds since Unix epoch (set by VesperCSI)
+    uint64_t timestamp; // microseconds since Unix epoch (set by VesperCSI)
     uint8_t  space20[26];
     uint8_t  num_rx;
     uint8_t  num_tx;
@@ -42,13 +58,13 @@ typedef struct __attribute__((__packed__)) vespercsi_csi_header_t {
     uint8_t  space54[4];
     uint32_t rssi1;
     uint32_t rssi2;
-    uint8_t  src_mac[6];        // source MAC address
+    uint8_t  src_mac[6];
     uint8_t  space75[18];
     uint32_t rateNflag;
     uint32_t space96[44];
 } vespercsi_csi_header_t;
 
-typedef struct __attribute__((aligned(4096))) vespercsi_plugin_csi_data_t {
+typedef struct __attribute__((__packed__)) vespercsi_plugin_csi_data_t {
     uint8_t csi_data[VESPERCSI_CSI_DATA_SIZE_MAX];
 } vespercsi_csi_data_t;
 
@@ -75,8 +91,6 @@ typedef struct vespercsi_csi_t {
 #define VESPERCSI_RATE_MCS_CHAN_WIDTH_40     (1 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
 #define VESPERCSI_RATE_MCS_CHAN_WIDTH_80     (2 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
 #define VESPERCSI_RATE_MCS_CHAN_WIDTH_160    (3 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
-
-
 
 // ================================================================
 // Plugin Internals
@@ -115,8 +129,8 @@ typedef struct vespercsi_plugin_config_t{
 
 typedef struct vespercsi_plugin_context_t{
     uint64_t sdk_version;
-     vespercsi_plugin_log_t log;
-     vespercsi_plugin_config_t config;
+    vespercsi_plugin_log_t log;
+    vespercsi_plugin_config_t config;
 }vespercsi_plugin_context_t;
 
 extern vespercsi_plugin_context_t vespercsi_plugin_context;
