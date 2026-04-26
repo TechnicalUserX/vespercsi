@@ -1,0 +1,141 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <poll.h>
+#include <linux/lirc.h>
+#include <sys/ioctl.h>
+#include <gpiod.h>
+#include <pthread.h>
+
+#ifdef  CONFIG_VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
+    #define LIRC_DEV CONFIG_VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
+#else
+    #define LIRC_DEV "/dev/lirc0"
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_DEV
+    #define GPIO_DEV CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_DEV
+#else
+    #define GPIO_DEV "/dev/gpiochip0"
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RED
+    #define GPIO_LINE_LED_RED CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RED
+#else
+    #define GPIO_LINE_LED_RED 27
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RGB_RED
+    #define GPIO_LINE_LED_RGB_RED CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RGB_RED
+#else
+    #define GPIO_LINE_LED_RGB_RED 28
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RGB_GREEN
+    #define GPIO_LINE_LED_RGB_GREEN CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RGB_GREEN
+#else
+    #define GPIO_LINE_LED_RGB_GREEN 29
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RGB_BLUE
+    #define GPIO_LINE_LED_RGB_BLUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RGB_BLUE
+#else
+    #define GPIO_LINE_LED_RGB_BLUE 30
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_BUZZER
+    #define GPIO_LINE_BUZZER CONFIG_VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_BUZZER
+#else
+    #define GPIO_LINE_BUZZER 31
+#endif
+
+
+// Command Values
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_START_CAPTURE_VALUE
+    #define ACTION_WALK_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_START_CAPTURE_VALUE
+#else
+    #define ACTION_WALK_VALUE 0xAA
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_WALK_VALUE
+    #define ACTION_WALK_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_WALK_VALUE
+#else
+    #define ACTION_WALK_VALUE 0xAA
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_RUN_VALUE
+    #define ACTION_RUN_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_RUN_VALUE
+#else
+    #define ACTION_RUN_VALUE 0xBB
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_JUMP_VALUE
+    #define ACTION_JUMP_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_JUMP_VALUE
+#else
+    #define ACTION_JUMP_VALUE 0xCC
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_STILL_VALUE
+    #define ACTION_STILL_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_STILL_VALUE
+#else
+    #define ACTION_STILL_VALUE 0xDD
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_SITDOWN_VALUE
+    #define ACTION_SITDOWN_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_SITDOWN_VALUE
+#else
+    #define ACTION_SITDOWN_VALUE 0xEE
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_STANDUP_VALUE
+    #define ACTION_STANDUP_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_STANDUP_VALUE
+#else
+    #define ACTION_STANDUP_VALUE 0xFF
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_FALL_VALUE
+    #define ACTION_FALL_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_FALL_VALUE
+#else
+    #define ACTION_FALL_VALUE 0x00
+#endif
+
+typedef enum command_t{
+    COMMAND_UNKNOWN,
+    COMMAND_START_CAPTURE,
+    COMMAND_STOP_CAPTURE,
+    COMMAND_SET_ACTION_WALK,
+    COMMAND_SET_ACTION_RUN,
+    COMMAND_SET_ACTION_JUMP,
+    COMMAND_SET_ACTION_STILL,
+    COMMAND_SET_ACTION_SITDOWN,
+    COMMAND_SET_ACTION_STANDUP,
+    COMMAND_SET_ACTION_FALL
+}command_t;
+
+typedef struct ir_label_state_t{
+    uint64_t current_label_code;
+    bool recording;
+    bool shutdown_signal;
+    
+    struct{
+        int fd;
+    }lirc;
+
+    struct{
+        struct gpiod_chip* chip;
+        struct gpiod_line* line_led_red;
+        struct gpiod_line* line_led_rgb[3];
+        struct gpiod_line* line_buzzer;
+    }gpio;
+
+    struct{
+        command_t previous;
+        command_t current;
+    }command;
+
+    pthread_t infrared_runner_thread;
+
+}ir_label_state_t;

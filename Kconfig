@@ -1,122 +1,128 @@
 mainmenu "VesperCSI Configuration"
 
-    config COMPILER
-        prompt "Compiler Settings"
-        bool
-        default n
+    menu "Compiler"
 
-    menu "Global Settings"
-        depends on COMPILER
+        menuconfig VESPERCSI_COMPILER_GLOBAL
+            bool "Set Global settings"
+            default n
 
-        config COMPILER_GLOBAL_CC
-            prompt "CC"
-            string
-            default "gcc"
-    
-        config COMPILER_GLOBAL_CFLAGS
-            prompt "CFLAGS"
-            string
-            default ""
+            config VESPERCSI_COMPILER_GLOBAL_CC
+                prompt "CC"
+                string
+                default "gcc"
+                depends on VESPERCSI_COMPILER_GLOBAL
+        
+            config VESPERCSI_COMPILER_GLOBAL_CFLAGS
+                prompt "CFLAGS"
+                string
+                default ""
+                depends on VESPERCSI_COMPILER_GLOBAL
 
-        config COMPILER_GLOBAL_CPPFLAGS
-            prompt "CPPFLAGS"
-            string
-            default ""
+            config VESPERCSI_COMPILER_GLOBAL_CPPFLAGS
+                prompt "CPPFLAGS"
+                string
+                default ""
+                depends on VESPERCSI_COMPILER_GLOBAL
 
-        config COMPILER_GLOBAL_CXX
-            prompt "CXX"
-            string
-            default "g++"
+            config VESPERCSI_COMPILER_GLOBAL_CXX
+                prompt "CXX"
+                string
+                default "g++"
+                depends on VESPERCSI_COMPILER_GLOBAL
 
-        config COMPILER_GLOBAL_CXXFLAGS
-            prompt "CXXFLAGS"
-            string
-            default ""
+            config VESPERCSI_COMPILER_GLOBAL_CXXFLAGS
+                prompt "CXXFLAGS"
+                string
+                default ""
+                depends on VESPERCSI_COMPILER_GLOBAL
 
-        config COMPILER_GLOBAL_LDFLAGS
-            prompt "LDFLAGS"
-            string
-            default ""
-
-    endmenu
-
-
-    config VESPERCSI_CSI
-        prompt "Channel State Information"
-        bool
-        default n
-
-    menu "Limits"
-        depends on VESPERCSI_CSI
-
-        config VESPERCSI_CSI_SUPPORTED_TX_MAX
-            prompt "Maximum TX Count"
-            int
-            default 1
-
-        config VESPERCSI_CSI_SUPPORTED_RX_MAX
-            prompt "Maximum RX Count"
-            int
-            default 1
-
-        config VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX
-            prompt "Maximum Subcarriers"
-            int
-            default 56
-
-        config VESPERCSI_CSI_SUPPORTED_TIME_FRAME_MAX
-            prompt "Maximum CSI Capture Time Frame"
-            int
-            default 3
-
-        config VESPERCSI_CSI_SUPPORTED_RATE_MAX
-            prompt "Maximum CSI Capture Per Second"
-            int
-            default 100
+            config VESPERCSI_COMPILER_GLOBAL_LDFLAGS
+                prompt "LDFLAGS"
+                string
+                default ""
+                depends on VESPERCSI_COMPILER_GLOBAL
 
     endmenu
 
-    config VESPERCSI_WIFI
-        prompt "Wireless"
-        bool
-        default n
+    menu "Channel State Information"
 
-    menu "Interface"
-        depends on VESPERCSI_WIFI
+        menuconfig VESPERCSI_CSI_LIMITS
+            prompt "Set Internal Limits"
+            bool
+            default n
 
-        config VESPERCSI_WIFI_INTERFACE
-            prompt "Monitor Mode Interface Name"
-            string
-            default "vespercsimon"
+            config VESPERCSI_CSI_SUPPORTED_TX_MAX
+                prompt "Maximum TX Count"
+                int
+                default 1
+                depends on VESPERCSI_CSI_LIMITS
+
+            config VESPERCSI_CSI_SUPPORTED_RX_MAX
+                prompt "Maximum RX Count"
+                int
+                default 1
+                depends on VESPERCSI_CSI_LIMITS
+
+            config VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX
+                prompt "Maximum Subcarriers"
+                int
+                default 56
+                depends on VESPERCSI_CSI_LIMITS
+
+            config VESPERCSI_CSI_SUPPORTED_TIME_FRAME_MAX
+                prompt "Maximum CSI Capture Time Frame"
+                int
+                default 3
+                depends on VESPERCSI_CSI_LIMITS
+
+            config VESPERCSI_CSI_SUPPORTED_RATE_MAX
+                prompt "Maximum CSI Capture Per Second"
+                int
+                default 100
+                depends on VESPERCSI_CSI_LIMITS
 
     endmenu
 
-    menu "Limits"
-        depends on VESPERCSI_WIFI
+    menu "Wireless"
 
-        config VESPERCSI_WIFI_INTERFACE_MAX_SIZE
-            prompt "Maximum number of interfaces enumerable"
-            int
-            default 10
+        menuconfig VESPERCSI_WIFI
+            prompt "Override Interface Settings"
+            bool
+            default n
 
-        config VESPERCSI_WIFI_PHY_MAX_SIZE
-            prompt "Maximum number of phys enumerable"
-            int
-            default 10
-            
+            config VESPERCSI_WIFI_INTERFACE
+                prompt "Monitor Mode Interface Name"
+                string
+                default "vespercsimon"
+                depends on VESPERCSI_WIFI
+
+            config VESPERCSI_WIFI_INTERFACE_MAX_SIZE
+                prompt "Maximum number of interfaces enumerable"
+                int
+                default 10
+                depends on VESPERCSI_WIFI
+
+            config VESPERCSI_WIFI_PHY_MAX_SIZE
+                prompt "Maximum number of phys enumerable"
+                int
+                default 10
+                depends on VESPERCSI_WIFI
+
     endmenu
 
-    config VESPERCSI_PLUGIN
-        prompt "Plugin System"
-        bool
-        default n
+    menu "Plugin System"
 
-    menu "Rules"
-        depends on VESPERCSI_PLUGIN
+        menuconfig VESPERCSI_PLUGINS
+            prompt "Override Plugin System Settings"
+            bool
+            default n
 
         config VESPERCSI_PLUGIN_FOLDER
             prompt "Directory to search for plugins"
             string
             default "/etc/vespercsi/plugins"
+            depends on VESPERCSI_PLUGINS
 
+        source "plugins/Kconfig"
+    
     endmenu

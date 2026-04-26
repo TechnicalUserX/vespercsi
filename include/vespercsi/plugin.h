@@ -15,6 +15,9 @@
 //    gcc -shared -fPIC -o my_plugin.so my_plugin.c
 // ================================================================
 
+#define VESPERCSI_OK 0
+#define VESPERCSI_FAIL 1
+
 #define VESPERCSI_PLUGIN_SDK_VERSION 1
 
 // ================================================================
@@ -143,10 +146,10 @@ extern vespercsi_plugin_context_t vespercsi_plugin_context;
 // Plugin API — symbols your shared library must/can export
 // ================================================================
 
-void vespercsi_plugin_function_init(vespercsi_plugin_context_t* context);
+int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context);
 
-void vespercsi_plugin_function_callback(const vespercsi_csi_t* csi);
+int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi);
 
-void vespercsi_plugin_function_destroy(void);
+int vespercsi_plugin_function_destroy(void);
 
 #endif

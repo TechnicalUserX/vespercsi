@@ -2,12 +2,13 @@
 
 vespercsi_plugin_context_t vespercsi_plugin_context;
 
-void vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
+int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     vespercsi_plugin_context = *context;
     LOG(INFO, "print_details: Plugin initalized");
+    return  VESPERCSI_OK;
 }
 
-void vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
+int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
 
     static uint64_t csi_counter = 0;
 
@@ -64,8 +65,10 @@ void vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
                                                                             channel_width_number,
                                                                             csi_counter
                                                                             );
+    return VESPERCSI_OK;                                                                            
 }
 
-void vespercsi_plugin_function_destroy(void){
+int vespercsi_plugin_function_destroy(void){
     LOG(INFO, "print_details: Plugin destroyed");
+    return VESPERCSI_OK;
 }

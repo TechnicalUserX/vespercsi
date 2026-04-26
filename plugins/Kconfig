@@ -1,0 +1,7 @@
+# Plugin Configurations
+
+menu "Configure Plugins"
+
+    source "/home/tux/VesperCSI/vespercsi/plugins/ir_label/Kconfig"
+
+endmenu

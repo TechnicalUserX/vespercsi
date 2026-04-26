@@ -15,7 +15,7 @@ static int sockfd = -1;
 static struct sockaddr_in dest_addr;
 static bool plugin_ready = false;
 
-void vespercsi_plugin_function_init(vespercsi_plugin_context_t* context) {
+int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context) {
     vespercsi_plugin_context = *context;
     
     config_t cfg;
@@ -42,7 +42,7 @@ void vespercsi_plugin_function_init(vespercsi_plugin_context_t* context) {
     if (sockfd < 0) {
         LOG(FAIL, "udp_send: Failed to create UDP socket");
         config_destroy(&cfg);
-        return;
+        return VESPERCSI_FAIL;
     }
 
     // Setup destination address struct
@@ -55,7 +55,7 @@ void vespercsi_plugin_function_init(vespercsi_plugin_context_t* context) {
         close(sockfd);
         sockfd = -1;
         config_destroy(&cfg);
-        return;
+        return VESPERCSI_FAIL;
     }
 
     // Free config memory now that the IP is safely loaded into the sockaddr struct
@@ -63,11 +63,12 @@ void vespercsi_plugin_function_init(vespercsi_plugin_context_t* context) {
 
     plugin_ready = true;
     LOG(INFO, "udp_send: Plugin initialized successfully");
+    return VESPERCSI_OK;
 }
 
-void vespercsi_plugin_function_callback(const vespercsi_csi_t* csi) {
+int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi) {
     if (!plugin_ready || sockfd < 0) {
-        return;
+        return VESPERCSI_FAIL;
     }
 
     // Use Scatter/Gather IO to avoid slow memory copies while bypassing the 4096-byte padding
@@ -96,13 +97,15 @@ void vespercsi_plugin_function_callback(const vespercsi_csi_t* csi) {
     } else {
         LOG_VERBOSE(VERBOSITY_1, DEBG, "udp_send: Sent %zd bytes over UDP", sent_bytes);
     }
+    return VESPERCSI_OK;
 }
 
-void vespercsi_plugin_function_destroy(void) {
+int vespercsi_plugin_function_destroy(void) {
     if (sockfd >= 0) {
         close(sockfd);
         sockfd = -1;
     }
     plugin_ready = false;
     LOG(INFO, "udp_send: Plugin destroyed");
+    return VESPERCSI_OK;
 }

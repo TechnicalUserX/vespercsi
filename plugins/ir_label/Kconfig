@@ -1,0 +1,15 @@
+menuconfig VESPERCSI_PLUGIN_IR_LABEL
+    bool "Infrared Labeling"
+    default n
+
+    config VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
+        prompt "Path for infrared device"
+        string
+        default "/dev/lirc0"
+        depends on PLUGIN_IR_LABEL
+
+    config VESPERCSI_PLUGIN_IR_LABEL_GPIO_DEV
+        prompt "Path for GPIO device"
+        string
+        default "/dev/gpiochip0"
+        depends on PLUGIN_IR_LABEL

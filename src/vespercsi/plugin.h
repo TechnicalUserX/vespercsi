@@ -38,9 +38,9 @@ typedef struct vespercsi_plugin_context_t{
 
 
 // Obligatory Function
-typedef void (*vespercsi_plugin_function_callback_t)(const vespercsi_csi_t* csi);
-typedef void (*vespercsi_plugin_function_init_t)(vespercsi_plugin_context_t* context);
-typedef void (*vespercsi_plugin_function_destroy_t)(void);
+typedef int (*vespercsi_plugin_function_callback_t)(const vespercsi_csi_t* csi);
+typedef int (*vespercsi_plugin_function_init_t)(vespercsi_plugin_context_t* context);
+typedef int (*vespercsi_plugin_function_destroy_t)(void);
 
 typedef struct vespercsi_plugin_t {
     bool set;

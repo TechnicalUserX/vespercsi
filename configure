@@ -19,7 +19,7 @@ PROJECT_BRIEF="A Derivative Work of FeitCSI for Embedded Linux"
 TARGETS=""
 
 # Available Targets (MODIFY HERE)
-TARGETS_AVAILABLE="vespercsi print-details udp-send packet-checker"
+TARGETS_AVAILABLE="vespercsi print-details udp-send packet-checker ir-label"
 
 ########################################
 # Default Source Extensions (MODIFY HERE)
@@ -862,6 +862,13 @@ for target in ${TARGETS}; do
             fi        
         ;;
 
+        ir-label)
+            if config_sources "$target" "plugins/ir_label"; then
+                config_log PASS "${PROJECT} Plugin sources: ir-label"
+            else
+                config_log FAIL "${PROJECT} Plugin sources: ir-label"
+            fi        
+        ;;
 
     esac
     
