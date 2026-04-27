@@ -61,6 +61,8 @@ static inline void buzzer_sequence_capture_stop(void){
     usleep(10000);
     set_pin(GPIO_LINE_BUZZER, 1);  
     usleep(10000);
+    set_pin(GPIO_LINE_BUZZER, 0);
+
 }
 
 static inline void buzzer_sequence_action_change(void){
@@ -344,7 +346,7 @@ void* infrared_runner(void* arg){
 
             // Good read, make something based on it
             command_t cmd = sc.scancode & 0xFF;
-            LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: Received command: 0x%02X", cmd);
+            LOG_VERBOSE(VERBOSITY_1, DEBG, "ir_label: Received command: 0x%02X", cmd);
             command_interpreter(cmd);
         }
 
