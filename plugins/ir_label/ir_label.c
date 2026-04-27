@@ -389,130 +389,134 @@ void letgo_resources(void){
 int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     vespercsi_plugin_context = *context;
 
-    if(context->config.set){
-        // Configuration file set
-
-        config_t cfg = {0};
-
-        if (!config_read_file(&cfg, context->config.path)) {
-            LOG(FAIL, "ir_label: config error: %s (line %d)\n",
-                config_error_text(&cfg),
-                config_error_line(&cfg));
-
-                letgo_resources();
-            config_destroy(&cfg);
-            return VESPERCSI_FAIL;
-        }
-
-        int temp_int = 0;
-        const char* temp_str = NULL;
-
-
-        if(config_lookup_string(&cfg, "out", &temp_str)){
-
-            state.out_fd = open(temp_str, O_CREAT | O_APPEND | O_WRONLY, 0644);
-
-            if(state.out_fd < 0){
-                LOG(FAIL, "ir_label: Cannot open file: %s: %s",temp_str, strerror(errno));
-                return VESPERCSI_FAIL;
-            }
-            strncpy(state.out_path, temp_str, sizeof(state.out_path)-1);
-
-        }else{
-            LOG(FAIL, "ir_label: Output file path not set in configuration file");
-            return VESPERCSI_FAIL;
-        }
-
-        // Walk
-        if(config_lookup_bool(&cfg, "action.walk.periodic", &temp_int)){
-            action_policies[ACTION_WALK].is_periodic = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.walk.duration", &temp_int)){
-            action_policies[ACTION_WALK].action_duration = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.walk.wait", &temp_int)){
-            action_policies[ACTION_WALK].action_wait = temp_int;
-        }
-
-        // Run
-        if(config_lookup_bool(&cfg, "action.run.periodic", &temp_int)){
-            action_policies[ACTION_RUN].is_periodic = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.run.duration", &temp_int)){
-            action_policies[ACTION_RUN].action_duration = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.run.wait", &temp_int)){
-            action_policies[ACTION_RUN].action_wait = temp_int;
-        }        
-
-        // Jump
-        if(config_lookup_bool(&cfg, "action.jump.periodic", &temp_int)){
-            action_policies[ACTION_JUMP].is_periodic = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.jump.duration", &temp_int)){
-            action_policies[ACTION_JUMP].action_duration = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.jump.wait", &temp_int)){
-            action_policies[ACTION_JUMP].action_wait = temp_int;
-        }            
-
-        // Still
-        if(config_lookup_bool(&cfg, "action.still.periodic", &temp_int)){
-            action_policies[ACTION_STILL].is_periodic = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.still.duration", &temp_int)){
-            action_policies[ACTION_STILL].action_duration = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.still.wait", &temp_int)){
-            action_policies[ACTION_STILL].action_wait = temp_int;
-        }     
-
-        // Stand up
-        if(config_lookup_bool(&cfg, "action.standup.periodic", &temp_int)){
-            action_policies[ACTION_STANDUP].is_periodic = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.standup.duration", &temp_int)){
-            action_policies[ACTION_STANDUP].action_duration = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.standup.wait", &temp_int)){
-            action_policies[ACTION_STANDUP].action_wait = temp_int;
-        }     
-
-        // Sit down
-        if(config_lookup_bool(&cfg, "action.sitdown.periodic", &temp_int)){
-            action_policies[ACTION_SITDOWN].is_periodic = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.sitdown.duration", &temp_int)){
-            action_policies[ACTION_SITDOWN].action_duration = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.sitdown.wait", &temp_int)){
-            action_policies[ACTION_SITDOWN].action_wait = temp_int;
-        }    
-
-        // Sit down and stand up
-        if(config_lookup_bool(&cfg, "action.sitstand.periodic", &temp_int)){
-            action_policies[ACTION_SITSTAND].is_periodic = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.sitstand.duration", &temp_int)){
-            action_policies[ACTION_SITSTAND].action_duration = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.sitstand.wait", &temp_int)){
-            action_policies[ACTION_SITSTAND].action_wait = temp_int;
-        }    
-
-        // Fall
-        if(config_lookup_bool(&cfg, "action.fall.periodic", &temp_int)){
-            action_policies[ACTION_FALL].is_periodic = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.fall.duration", &temp_int)){
-            action_policies[ACTION_FALL].action_duration = temp_int;
-        }
-        if(config_lookup_bool(&cfg, "action.fall.wait", &temp_int)){
-            action_policies[ACTION_FALL].action_wait = temp_int;
-        }    
-
-        config_destroy(&cfg);
+    if(!context->config.set){
+        LOG(FAIL, "ir_label: Config file needed");
+        return VESPERCSI_FAIL;
     }
+
+    // Configuration file set
+
+    config_t cfg = {0};
+
+    if (!config_read_file(&cfg, context->config.path)) {
+        LOG(FAIL, "ir_label: config error: %s (line %d)\n",
+            config_error_text(&cfg),
+            config_error_line(&cfg));
+
+            letgo_resources();
+        config_destroy(&cfg);
+        return VESPERCSI_FAIL;
+    }
+
+    int temp_int = 0;
+    const char* temp_str = NULL;
+
+
+    if(config_lookup_string(&cfg, "out", &temp_str)){
+
+        state.out_fd = open(temp_str, O_CREAT | O_APPEND | O_WRONLY, 0644);
+
+        if(state.out_fd < 0){
+            LOG(FAIL, "ir_label: Cannot open file: %s: %s",temp_str, strerror(errno));
+            return VESPERCSI_FAIL;
+        }
+        strncpy(state.out_path, temp_str, sizeof(state.out_path)-1);
+
+    }else{
+        LOG(FAIL, "ir_label: Output file path not set in configuration file");
+        return VESPERCSI_FAIL;
+    }
+
+    // Walk
+    if(config_lookup_bool(&cfg, "action.walk.periodic", &temp_int)){
+        action_policies[ACTION_WALK].is_periodic = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.walk.duration", &temp_int)){
+        action_policies[ACTION_WALK].action_duration = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.walk.wait", &temp_int)){
+        action_policies[ACTION_WALK].action_wait = temp_int;
+    }
+
+    // Run
+    if(config_lookup_bool(&cfg, "action.run.periodic", &temp_int)){
+        action_policies[ACTION_RUN].is_periodic = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.run.duration", &temp_int)){
+        action_policies[ACTION_RUN].action_duration = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.run.wait", &temp_int)){
+        action_policies[ACTION_RUN].action_wait = temp_int;
+    }        
+
+    // Jump
+    if(config_lookup_bool(&cfg, "action.jump.periodic", &temp_int)){
+        action_policies[ACTION_JUMP].is_periodic = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.jump.duration", &temp_int)){
+        action_policies[ACTION_JUMP].action_duration = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.jump.wait", &temp_int)){
+        action_policies[ACTION_JUMP].action_wait = temp_int;
+    }            
+
+    // Still
+    if(config_lookup_bool(&cfg, "action.still.periodic", &temp_int)){
+        action_policies[ACTION_STILL].is_periodic = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.still.duration", &temp_int)){
+        action_policies[ACTION_STILL].action_duration = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.still.wait", &temp_int)){
+        action_policies[ACTION_STILL].action_wait = temp_int;
+    }     
+
+    // Stand up
+    if(config_lookup_bool(&cfg, "action.standup.periodic", &temp_int)){
+        action_policies[ACTION_STANDUP].is_periodic = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.standup.duration", &temp_int)){
+        action_policies[ACTION_STANDUP].action_duration = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.standup.wait", &temp_int)){
+        action_policies[ACTION_STANDUP].action_wait = temp_int;
+    }     
+
+    // Sit down
+    if(config_lookup_bool(&cfg, "action.sitdown.periodic", &temp_int)){
+        action_policies[ACTION_SITDOWN].is_periodic = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.sitdown.duration", &temp_int)){
+        action_policies[ACTION_SITDOWN].action_duration = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.sitdown.wait", &temp_int)){
+        action_policies[ACTION_SITDOWN].action_wait = temp_int;
+    }    
+
+    // Sit down and stand up
+    if(config_lookup_bool(&cfg, "action.sitstand.periodic", &temp_int)){
+        action_policies[ACTION_SITSTAND].is_periodic = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.sitstand.duration", &temp_int)){
+        action_policies[ACTION_SITSTAND].action_duration = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.sitstand.wait", &temp_int)){
+        action_policies[ACTION_SITSTAND].action_wait = temp_int;
+    }    
+
+    // Fall
+    if(config_lookup_bool(&cfg, "action.fall.periodic", &temp_int)){
+        action_policies[ACTION_FALL].is_periodic = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.fall.duration", &temp_int)){
+        action_policies[ACTION_FALL].action_duration = temp_int;
+    }
+    if(config_lookup_bool(&cfg, "action.fall.wait", &temp_int)){
+        action_policies[ACTION_FALL].action_wait = temp_int;
+    }    
+
+    config_destroy(&cfg);
+
 
     //==========================================================//
     //==================== Infrared Setup ======================//
@@ -546,8 +550,6 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     //==========================================================//
     //======================= GPIO Setup =======================//
 
-//==========================================================//
-    //======================= GPIO Setup =======================//
 
     state.gpio.chip = gpiod_chip_open(GPIO_DEV);
     if (!state.gpio.chip) {
