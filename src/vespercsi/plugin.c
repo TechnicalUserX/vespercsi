@@ -12,8 +12,13 @@ void vespercsi_plugin_load(void){
     // RTLD_LOCAL — don't pollute global symbol namespace
     void* handle = NULL;
 
-    
-    if(strcmp(dirname(vespercsi_plugin.path), ".") == 0 && strstr(vespercsi_plugin.path, "/") == NULL){
+    char plugin_path[512] = {0};
+    char* plugin_path_dirname = NULL;
+    strncpy(plugin_path, vespercsi_plugin.path, sizeof(plugin_path)-1);
+
+    plugin_path_dirname = dirname(plugin_path);
+
+    if(strcmp(plugin_path_dirname, ".") == 0 && strstr(vespercsi_plugin.path, "/") == NULL){
         // Search under /etc/vespercsi/plugins
         char search_path[512] = VESPERCSI_PLUGIN_FOLDER "/";
         strncat(search_path, vespercsi_plugin.path, sizeof(search_path)-1-sizeof(VESPERCSI_PLUGIN_FOLDER));
