@@ -36,17 +36,17 @@ static inline void set_pin(int pin, int value){
 
 static inline void buzzer_sequence_input(void){
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(500);
+    usleep(5000);
     set_pin(GPIO_LINE_BUZZER, 0);
 }
 
 static inline void buzzer_sequence_capture_start(void){
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(1000);
+    usleep(10000);
     set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(1000);
+    usleep(10000);
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(1000);
+    usleep(10000);
     set_pin(GPIO_LINE_BUZZER, 0);    
 }
 
@@ -65,37 +65,18 @@ static inline void buzzer_sequence_capture_stop(void){
 
 static inline void buzzer_sequence_action_change(void){
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(800);
+    usleep(8000);
     set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(800);
+    usleep(8000);
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(800);
+    usleep(8000);
     set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(800);
+    usleep(8000);
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(800);    
+    usleep(8000);    
     set_pin(GPIO_LINE_BUZZER, 0);
 }
 
-static inline void buzzer_sequence_capture_periodic_start(void){
-
-    set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(1000);
-    set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(1000);
-    set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(1000);
-    set_pin(GPIO_LINE_BUZZER, 0);    
-}
-
-static inline void buzzer_sequence_capture_periodic_stop(){
-    set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(10000);
-    set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(10000);
-    set_pin(GPIO_LINE_BUZZER, 1);    
-    usleep(10000);
-}
 
 static inline void red_led_capture_start(){
     set_pin(GPIO_LINE_LED_RED, 1);
@@ -197,7 +178,7 @@ void* periodic_runner(void* arg){
 
         red_led_capture_about_to_start();
         red_led_capture_start();
-        buzzer_sequence_capture_periodic_start();
+        buzzer_sequence_capture_start();
 
         if(state.action.current == ACTION_SITSTAND){
             if(state.action.effective == ACTION_STANDUP){
@@ -219,7 +200,7 @@ void* periodic_runner(void* arg){
         state.capture.enable = false;
 
         red_led_capture_stop();
-        buzzer_sequence_capture_periodic_stop();
+        buzzer_sequence_capture_stop();
 
         start_time = wallclock_us();
 
