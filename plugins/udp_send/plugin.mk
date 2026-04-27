@@ -9,11 +9,11 @@ ${BUILD_BIN_DIR}/udp_send.vesper: ${UDP_SEND_OBJ}
 
 udp-send-install: superuser
 	@$(call build_log, "Installing...")
-	@${MKDIR_P} ${DESTDIR}${PREFIX}/etc/vespercsi/plugins
-	@install --target-directory ${DESTDIR}${PREFIX}/etc/vespercsi/plugins ${BUILD_BIN_DIR}/udp_send.vesper
+	@${MKDIR_P} ${DESTDIR}/etc/vespercsi/plugins
+	@install --target-directory ${DESTDIR}/etc/vespercsi/plugins ${BUILD_BIN_DIR}/udp_send.vesper
 
 udp-send-uninstall: superuser
 	@$(call build_log, "Uninstalling...")
-	@rm -f ${DESTDIR}${PREFIX}/etc/vespercsi/plugins/udp_send.vesper
+	@rm -f ${DESTDIR}/etc/vespercsi/plugins/udp_send.vesper
 
 $(eval $(call autoconf_include,udp-send))

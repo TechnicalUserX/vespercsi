@@ -9,11 +9,11 @@ ${BUILD_BIN_DIR}/ir_label.vesper: ${IR_LABEL_OBJ}
 
 ir-label-install: superuser
 	@$(call build_log, "Installing...")
-	@${MKDIR_P} ${DESTDIR}${PREFIX}/etc/vespercsi/plugins
-	@install --target-directory ${DESTDIR}${PREFIX}/etc/vespercsi/plugins ${BUILD_BIN_DIR}/ir_label.vesper
+	@${MKDIR_P} ${DESTDIR}/etc/vespercsi/plugins
+	@install --target-directory ${DESTDIR}/etc/vespercsi/plugins ${BUILD_BIN_DIR}/ir_label.vesper
 
 ir-label-uninstall: superuser
 	@$(call build_log, "Uninstalling...")
-	@rm -f ${DESTDIR}${PREFIX}/etc/vespercsi/plugins/ir_label.vesper
+	@rm -f ${DESTDIR}/etc/vespercsi/plugins/ir_label.vesper
 
 $(eval $(call autoconf_include,ir-label))
