@@ -19,14 +19,14 @@ void vespercsi_plugin_load(void){
         strncat(search_path, vespercsi_plugin.path, sizeof(search_path)-1-sizeof(VESPERCSI_PLUGIN_FOLDER));
         handle = dlopen(search_path, RTLD_NOW | RTLD_LOCAL);
         if (!handle) {
-            fprintf(stdout, "VesperCSI: Plugin load failed: %s", dlerror());
+            fprintf(stdout, "VesperCSI: Plugin load failed: %s\n", dlerror());
             exit(EXIT_FAILURE);
         }
     }else{
-        // Absolute path
+        // Absolute (or relative) path
         handle = dlopen(vespercsi_plugin.path, RTLD_NOW | RTLD_LOCAL);
         if (!handle) {
-            fprintf(stdout, "VesperCSI: Plugin load failed: %s", dlerror());
+            fprintf(stdout, "VesperCSI: Plugin load failed: %s\n", dlerror());
             exit(EXIT_FAILURE);
         }
     }
@@ -39,7 +39,7 @@ void vespercsi_plugin_load(void){
 
     const char* err = dlerror();
     if (err) {
-        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_callback: %s", err);
+        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_callback: %s\n", err);
         dlclose(handle);
         exit(EXIT_FAILURE);
     }
@@ -49,7 +49,7 @@ void vespercsi_plugin_load(void){
     
     err = dlerror();
     if (err) {
-        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_init: %s", err);
+        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_init: %s\n", err);
         dlclose(handle);
         exit(EXIT_FAILURE);
     }
@@ -58,7 +58,7 @@ void vespercsi_plugin_load(void){
     
     err = dlerror();
     if (err) {
-        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_destroy: %s", err);
+        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_destroy: %s\n", err);
         dlclose(handle);
         exit(EXIT_FAILURE);
     }
@@ -83,7 +83,7 @@ void vespercsi_plugin_load(void){
     }
 
     if(vespercsi_plugin.init(&new_context) == VESPERCSI_FAIL){
-        fprintf(stdout, "VesperCSI: Plugin cannot be initialized");
+        fprintf(stdout, "VesperCSI: Plugin cannot be initialized\n");
         dlclose(handle);
         exit(EXIT_FAILURE);
     }else{
