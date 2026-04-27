@@ -15,7 +15,7 @@ void vespercsi_plugin_load(void){
     
     if(strcmp(dirname(vespercsi_plugin.path), ".") == 0 && strstr(vespercsi_plugin.path, "/") == NULL){
         // Search under /etc/vespercsi/plugins
-        char search_path[512] = VESPERCSI_PLUGIN_FOLDER;
+        char search_path[512] = VESPERCSI_PLUGIN_FOLDER "/";
         strncat(search_path, vespercsi_plugin.path, sizeof(search_path)-1-sizeof(VESPERCSI_PLUGIN_FOLDER));
         handle = dlopen(search_path, RTLD_NOW | RTLD_LOCAL);
         if (!handle) {
