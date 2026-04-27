@@ -312,8 +312,10 @@ void command_interpreter(command_t cmd){
                 state.command.current = cmd;
 
                 if(state.command.current != state.command.previous){
-                    LOG(INFO, "ir_label: Changing action to %s", action_to_string(state.command.current));
+
                     state.action.current =  command_to_action(state.command.current);
+
+                    LOG(INFO, "ir_label: Changing action to %s", action_to_string(state.action.current));
 
                     if(state.action.current == ACTION_SITSTAND){
                         state.action.effective = ACTION_STANDUP;
