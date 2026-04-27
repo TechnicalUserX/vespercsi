@@ -16,6 +16,7 @@
 #include <time.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 
 #ifdef  CONFIG_VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
     #define LIRC_DEV CONFIG_VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
@@ -143,6 +144,8 @@ typedef struct action_policy_t{
     // If periodic:
     uint64_t action_duration; // Action duration, valid time interval for recording
     uint64_t action_wait; // Time to wait between each recordings
+    uint64_t action_count; // If zero, it means no bound
+    uint64_t action_hold; // Amount of time to wait before beginning 
 }action_policy_t;
 
 extern action_policy_t action_policies[8];
@@ -154,8 +157,11 @@ typedef struct ir_label_header_t{
 
 typedef struct ir_label_state_t{
 
-    int out_fd;
-    char out_path[512];
+    struct{
+        int fd;
+        char directory[512];
+        bool include_timestamp;
+    }out;
 
     struct{
         _Atomic(uint64_t) index;

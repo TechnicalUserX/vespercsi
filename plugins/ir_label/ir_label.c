@@ -1,9 +1,12 @@
-#include <fcntl.h>
 #include <vespercsi/plugin.h>
 #include "ir_label.h"
 
-vespercsi_plugin_context_t vespercsi_plugin_context;
-ir_label_state_t state = {0};
+vespercsi_plugin_context_t vespercsi_plugin_context = {0};
+
+ir_label_state_t state = {
+    .action = {ACTION_WALK, ACTION_WALK}
+};
+
 action_policy_t action_policies[8] = {0};
 
 const char* action_to_string(action_t action){
@@ -79,7 +82,6 @@ static inline void buzzer_sequence_action_change(void){
     set_pin(GPIO_LINE_BUZZER, 0);
 }
 
-
 static inline void red_led_capture_start(){
     set_pin(GPIO_LINE_LED_RED, 1);
 }
@@ -103,13 +105,11 @@ static inline void red_led_capture_about_to_start(){
     usleep(800000);    
 }
 
-
 static inline uint64_t wallclock_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
 }
-
 
 label_t action_to_label(action_t action){
 
@@ -140,7 +140,6 @@ action_t command_to_action(command_t cmd){
         default:                            return ACTION_UNKNOWN;
     }
 }
-
 
 void* periodic_runner(void* arg){
 
@@ -368,8 +367,8 @@ void letgo_resources(void){
         close(state.lirc.fd);
     }
 
-    if (state.out_fd > 0){
-        close(state.out_fd);
+    if (state.out.fd > 0){
+        close(state.out.fd);
     }    
 }
 
@@ -381,16 +380,12 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         return VESPERCSI_FAIL;
     }
 
-    // Configuration file set
-
+    // Configuration file set //
     config_t cfg = {0};
 
-    if (!config_read_file(&cfg, context->config.path)) {
-        LOG(FAIL, "ir_label: config error: %s (line %d)\n",
-            config_error_text(&cfg),
-            config_error_line(&cfg));
-
-            letgo_resources();
+    if(!config_read_file(&cfg, context->config.path)){
+        LOG(FAIL, "ir_label: config error: %s (line %d)\n", config_error_text(&cfg), config_error_line(&cfg));
+        letgo_resources();
         config_destroy(&cfg);
         return VESPERCSI_FAIL;
     }
@@ -398,21 +393,41 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     int temp_int = 0;
     const char* temp_str = NULL;
 
+    if(config_lookup_string(&cfg, "out.directory", &temp_str)){
 
-    if(config_lookup_string(&cfg, "out", &temp_str)){
+        char absolute_path[512] = {0};
+        uint64_t available = 511;
 
-        state.out_fd = open(temp_str, O_CREAT | O_APPEND | O_WRONLY, 0644);
+        strncat(absolute_path, temp_str, available);
+        available -= strnlen(temp_str, available);
 
-        if(state.out_fd < 0){
-            LOG(FAIL, "ir_label: Cannot open file: %s: %s",temp_str, strerror(errno));
+        if(state.out.include_timestamp){
+
+            time_t raw_time;
+            struct tm *info = NULL;
+            char buffer[80] = {0};
+            time(&raw_time);
+
+            info = localtime(&raw_time);            
+            strftime(buffer, 512, "%Y%m%d%H%M%S", info);
+
+        }
+        
+        state.out.fd = open(temp_str, O_CREAT | O_APPEND | O_WRONLY, 0644);
+
+        if(state.out.fd < 0){
+            LOG(FAIL, "ir_label: Cannot open file: %s: %s", temp_str, strerror(errno));
             return VESPERCSI_FAIL;
         }
-        strncpy(state.out_path, temp_str, sizeof(state.out_path)-1);
 
+        strncpy(state.out.directory, temp_str, sizeof(state.out.directory)-1);
+    
     }else{
-        LOG(FAIL, "ir_label: Output file path not set in configuration file");
-        return VESPERCSI_FAIL;
+        state.out.fd = -1;
     }
+
+    // Action Policy Configuration //
+
 
     // Walk
     if(config_lookup_bool(&cfg, "action.walk.periodic", &temp_int)){
@@ -424,6 +439,12 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(config_lookup_bool(&cfg, "action.walk.wait", &temp_int)){
         action_policies[ACTION_WALK].action_wait = temp_int;
     }
+    if(config_lookup_bool(&cfg, "action.walk.hold", &temp_int)){
+        action_policies[ACTION_WALK].action_hold = temp_int;
+    }   
+    if(config_lookup_bool(&cfg, "action.walk.count", &temp_int)){
+        action_policies[ACTION_WALK].action_count = temp_int;
+    }         
 
     // Run
     if(config_lookup_bool(&cfg, "action.run.periodic", &temp_int)){
@@ -435,6 +456,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(config_lookup_bool(&cfg, "action.run.wait", &temp_int)){
         action_policies[ACTION_RUN].action_wait = temp_int;
     }        
+    if(config_lookup_bool(&cfg, "action.run.hold", &temp_int)){
+        action_policies[ACTION_RUN].action_hold = temp_int;
+    }   
+    if(config_lookup_bool(&cfg, "action.run.count", &temp_int)){
+        action_policies[ACTION_RUN].action_count = temp_int;
+    } 
+
 
     // Jump
     if(config_lookup_bool(&cfg, "action.jump.periodic", &temp_int)){
@@ -446,6 +474,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(config_lookup_bool(&cfg, "action.jump.wait", &temp_int)){
         action_policies[ACTION_JUMP].action_wait = temp_int;
     }            
+    if(config_lookup_bool(&cfg, "action.jump.hold", &temp_int)){
+        action_policies[ACTION_JUMP].action_hold = temp_int;
+    }   
+    if(config_lookup_bool(&cfg, "action.jump.count", &temp_int)){
+        action_policies[ACTION_JUMP].action_count = temp_int;
+    } 
+
 
     // Still
     if(config_lookup_bool(&cfg, "action.still.periodic", &temp_int)){
@@ -457,6 +492,12 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(config_lookup_bool(&cfg, "action.still.wait", &temp_int)){
         action_policies[ACTION_STILL].action_wait = temp_int;
     }     
+    if(config_lookup_bool(&cfg, "action.still.hold", &temp_int)){
+        action_policies[ACTION_STILL].action_hold = temp_int;
+    }   
+    if(config_lookup_bool(&cfg, "action.still.count", &temp_int)){
+        action_policies[ACTION_STILL].action_count = temp_int;
+    }
 
     // Stand up
     if(config_lookup_bool(&cfg, "action.standup.periodic", &temp_int)){
@@ -468,6 +509,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(config_lookup_bool(&cfg, "action.standup.wait", &temp_int)){
         action_policies[ACTION_STANDUP].action_wait = temp_int;
     }     
+    if(config_lookup_bool(&cfg, "action.standup.hold", &temp_int)){
+        action_policies[ACTION_STANDUP].action_hold = temp_int;
+    }   
+    if(config_lookup_bool(&cfg, "action.standup.count", &temp_int)){
+        action_policies[ACTION_STANDUP].action_count = temp_int;
+    }
+
 
     // Sit down
     if(config_lookup_bool(&cfg, "action.sitdown.periodic", &temp_int)){
@@ -479,6 +527,12 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(config_lookup_bool(&cfg, "action.sitdown.wait", &temp_int)){
         action_policies[ACTION_SITDOWN].action_wait = temp_int;
     }    
+    if(config_lookup_bool(&cfg, "action.sitdown.hold", &temp_int)){
+        action_policies[ACTION_SITDOWN].action_hold = temp_int;
+    }   
+    if(config_lookup_bool(&cfg, "action.sitdown.count", &temp_int)){
+        action_policies[ACTION_SITDOWN].action_count = temp_int;
+    }
 
     // Sit down and stand up
     if(config_lookup_bool(&cfg, "action.sitstand.periodic", &temp_int)){
@@ -490,6 +544,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(config_lookup_bool(&cfg, "action.sitstand.wait", &temp_int)){
         action_policies[ACTION_SITSTAND].action_wait = temp_int;
     }    
+    if(config_lookup_bool(&cfg, "action.sitstand.hold", &temp_int)){
+        action_policies[ACTION_SITSTAND].action_hold = temp_int;
+    }   
+    if(config_lookup_bool(&cfg, "action.sitstand.count", &temp_int)){
+        action_policies[ACTION_SITSTAND].action_count = temp_int;
+    }
+
 
     // Fall
     if(config_lookup_bool(&cfg, "action.fall.periodic", &temp_int)){
@@ -500,7 +561,19 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     }
     if(config_lookup_bool(&cfg, "action.fall.wait", &temp_int)){
         action_policies[ACTION_FALL].action_wait = temp_int;
-    }    
+    }
+    if(config_lookup_bool(&cfg, "action.fall.hold", &temp_int)){
+        action_policies[ACTION_FALL].action_hold = temp_int;
+    }   
+    if(config_lookup_bool(&cfg, "action.fall.count", &temp_int)){
+        action_policies[ACTION_FALL].action_count = temp_int;
+    }
+
+
+
+
+
+
 
     config_destroy(&cfg);
 
@@ -620,31 +693,37 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
 
     if(state.capture.enable){
 
-        ir_label_header_t ir_label_header;
+        ir_label_header_t ir_label_header = {0};
 
         label_t current_label = 0;
 
         ir_label_header.label = action_to_label(state.action.effective);
         ir_label_header.index = state.capture.index;
 
-        struct iovec iov[3];
+        if(state.out.fd > 0){
 
-        iov[0].iov_base = (void*)&ir_label_header;
-        iov[0].iov_len = sizeof(ir_label_header);
-        iov[1].iov_base = (void*)&csi->header;
-        iov[1].iov_len  = VESPERCSI_CSI_HEADER_LENGTH;
-        iov[2].iov_base = (void*)&csi->data.csi_data;
-        iov[2].iov_len  = csi->header.csi_data_size;
+            struct iovec iov[3];
 
-        size_t io_write_size = iov[0].iov_len + iov[1].iov_len + iov[2].iov_len; 
+            iov[0].iov_base = (void*)&ir_label_header;
+            iov[0].iov_len = sizeof(ir_label_header);
+            iov[1].iov_base = (void*)&csi->header;
+            iov[1].iov_len  = VESPERCSI_CSI_HEADER_LENGTH;
+            iov[2].iov_base = (void*)&csi->data.csi_data;
+            iov[2].iov_len  = csi->header.csi_data_size;
 
-        ssize_t s = writev(state.out_fd, iov, 3);
+            size_t io_write_size = iov[0].iov_len + iov[1].iov_len + iov[2].iov_len; 
 
-        if(s == io_write_size){
-            LOG_VERBOSE(VERBOSITY_2, INFO,"ir_label: CSI with size %ld written to file %s", io_write_size, state.out_path);
-        }else{
-            LOG_VERBOSE(VERBOSITY_2, WARN, "ir_label: CSI with size %ld data not written: %s", io_write_size, strerror(errno));
-        }        
+            ssize_t s = writev(state.out.fd, iov, 3);
+
+            if(s == io_write_size){
+                LOG_VERBOSE(VERBOSITY_2, INFO,"ir_label: CSI with size %ld written to file %s", io_write_size, state.out.path);
+            }else{
+                LOG_VERBOSE(VERBOSITY_2, WARN, "ir_label: CSI with size %ld data not written: %s", io_write_size, strerror(errno));
+            }
+
+        }
+
+
 
     }
 
