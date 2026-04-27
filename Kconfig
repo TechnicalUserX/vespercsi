@@ -7,38 +7,32 @@ mainmenu "VesperCSI Configuration"
             default n
 
             config VESPERCSI_COMPILER_GLOBAL_CC
-                prompt "CC"
-                string
+                string "CC"
                 default "gcc"
                 depends on VESPERCSI_COMPILER_GLOBAL
         
             config VESPERCSI_COMPILER_GLOBAL_CFLAGS
-                prompt "CFLAGS"
-                string
+                string "CFLAGS"
                 default ""
                 depends on VESPERCSI_COMPILER_GLOBAL
 
             config VESPERCSI_COMPILER_GLOBAL_CPPFLAGS
-                prompt "CPPFLAGS"
-                string
+                string "CPPFLAGS"
                 default ""
                 depends on VESPERCSI_COMPILER_GLOBAL
 
             config VESPERCSI_COMPILER_GLOBAL_CXX
-                prompt "CXX"
-                string
+                string "CXX"
                 default "g++"
                 depends on VESPERCSI_COMPILER_GLOBAL
 
             config VESPERCSI_COMPILER_GLOBAL_CXXFLAGS
-                prompt "CXXFLAGS"
-                string
+                string "CXXFLAGS"
                 default ""
                 depends on VESPERCSI_COMPILER_GLOBAL
 
             config VESPERCSI_COMPILER_GLOBAL_LDFLAGS
-                prompt "LDFLAGS"
-                string
+                string "LDFLAGS"
                 default ""
                 depends on VESPERCSI_COMPILER_GLOBAL
 
@@ -47,37 +41,31 @@ mainmenu "VesperCSI Configuration"
     menu "Channel State Information"
 
         menuconfig VESPERCSI_CSI_LIMITS
-            prompt "Set Internal Limits"
-            bool
+            bool "Set Internal Limits"
             default n
 
             config VESPERCSI_CSI_SUPPORTED_TX_MAX
-                prompt "Maximum TX Count"
-                int
+                int "Maximum Supported TX Count"
                 default 1
                 depends on VESPERCSI_CSI_LIMITS
 
             config VESPERCSI_CSI_SUPPORTED_RX_MAX
-                prompt "Maximum RX Count"
-                int
+                int "Maximum Supported RX Count"
                 default 1
                 depends on VESPERCSI_CSI_LIMITS
 
             config VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX
-                prompt "Maximum Subcarriers"
-                int
+                int "Maximum Supported Subcarriers"
                 default 56
                 depends on VESPERCSI_CSI_LIMITS
 
             config VESPERCSI_CSI_SUPPORTED_TIME_FRAME_MAX
-                prompt "Maximum CSI Capture Time Frame"
-                int
+                int "Maximum Supported CSI Capture Time Frame"
                 default 3
                 depends on VESPERCSI_CSI_LIMITS
 
             config VESPERCSI_CSI_SUPPORTED_RATE_MAX
-                prompt "Maximum CSI Capture Per Second"
-                int
+                int "Maximum Supported CSI Capture Per Second"
                 default 100
                 depends on VESPERCSI_CSI_LIMITS
 
@@ -86,25 +74,21 @@ mainmenu "VesperCSI Configuration"
     menu "Wireless"
 
         menuconfig VESPERCSI_WIFI
-            prompt "Override Interface Settings"
-            bool
+            bool "Override Interface Defaults"
             default n
 
             config VESPERCSI_WIFI_INTERFACE
-                prompt "Monitor Mode Interface Name"
-                string
+                string "Monitor Mode Interface Name"
                 default "vespercsimon"
                 depends on VESPERCSI_WIFI
 
             config VESPERCSI_WIFI_INTERFACE_MAX_SIZE
-                prompt "Maximum number of interfaces enumerable"
-                int
+                int "Maximum number of interfaces enumerable"
                 default 10
                 depends on VESPERCSI_WIFI
 
             config VESPERCSI_WIFI_PHY_MAX_SIZE
-                prompt "Maximum number of phys enumerable"
-                int
+                int "Maximum number of phys enumerable"
                 default 10
                 depends on VESPERCSI_WIFI
 
@@ -113,13 +97,11 @@ mainmenu "VesperCSI Configuration"
     menu "Plugin System"
 
         menuconfig VESPERCSI_PLUGINS
-            prompt "Override Plugin System Settings"
-            bool
+            bool "Override Plugin System Defaults"
             default n
 
         config VESPERCSI_PLUGIN_FOLDER
-            prompt "Directory to search for plugins"
-            string
+            string "Directory to search for plugins"
             default "/etc/vespercsi/plugins"
             depends on VESPERCSI_PLUGINS
 

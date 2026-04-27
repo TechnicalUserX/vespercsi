@@ -2,14 +2,113 @@ menuconfig VESPERCSI_PLUGIN_IR_LABEL
     bool "Infrared Labeling"
     default n
 
-    config VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
-        prompt "Path for infrared device"
-        string
-        default "/dev/lirc0"
-        depends on PLUGIN_IR_LABEL
+    config VESPERCSI_PLUGIN_IR_LABEL_LIRC
+        bool "Linux Infrared Remote Control (LIRC) Setup"
+        default n
+        depends on VESPERCSI_PLUGIN_IR_LABEL
 
-    config VESPERCSI_PLUGIN_IR_LABEL_GPIO_DEV
-        prompt "Path for GPIO device"
-        string
-        default "/dev/gpiochip0"
-        depends on PLUGIN_IR_LABEL
+    if VESPERCSI_PLUGIN_IR_LABEL_LIRC
+
+        config VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
+            string "Path for infrared device"
+            default "/dev/lirc0"
+
+    endif
+
+    config VESPERCSI_PLUGIN_IR_LABEL_GPIO
+        bool "GPIO Setup"
+        default n
+        depends on VESPERCSI_PLUGIN_IR_LABEL
+
+    if VESPERCSI_PLUGIN_IR_LABEL_GPIO
+
+        config VESPERCSI_PLUGIN_IR_LABEL_GPIO_DEV
+            string "Path for GPIO device"
+            default "/dev/gpiochip0"
+
+        config VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RED
+            int "Red LED pin number"
+            default 27
+
+        config VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_BUZZER
+            int "Buzzer pin number"
+            default 22
+
+        config VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RGB_RED
+            int "RGB LED (RED) pin number"
+            default 23
+
+        config VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RGB_GREEN
+            int "RGB LED (GREEN) pin number"
+            default 24    
+
+        config VESPERCSI_PLUGIN_IR_LABEL_GPIO_LINE_LED_RGB_BLUE
+            int "RGB LED (BLUE) pin number"
+            default 25
+
+    endif
+
+
+    config VESPERCSI_PLUGIN_IR_LABEL_COMMANDS
+        bool "Command Value Assignment"
+        default n
+        depends on VESPERCSI_PLUGIN_IR_LABEL
+
+    if VESPERCSI_PLUGIN_IR_LABEL_COMMANDS
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_START_CAPTURE
+            hex "Start Capture"
+            default 0xA0
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_STOP_CAPTURE
+            hex "Stop Capture"
+            default 0xA1            
+            
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_WALK
+            hex "Set current action to walk"
+            default 0xB1  
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_RUN
+            hex "Set current action to run"
+            default 0xB2 
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_JUMP
+            hex "Set current action to jump"
+            default 0xB3
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STILL
+            hex "Set current action to still"
+            default 0xB4
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STANDUP
+            hex "Set current action to stand up"
+            default 0xB5
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITDOWN
+            hex "Set current action to sit down"
+            default 0xB6
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_FALL
+            hex "Set current action to fall"
+            default 0xB7
+
+    endif
+
+    config VESPERCSI_PLUGIN_IR_LABEL_ACTIONS
+        bool "Actions"
+        default n
+        depends on VESPERCSI_PLUGIN_IR_LABEL
+
+    if VESPERCSI_PLUGIN_IR_LABEL_ACTIONS
+
+        config VESPERCSI_PLUGIN_IR_LABEL_ACTION_POLICY_PERIODIC_DEFAULT_DURATION
+            int "Default wait time between captures in periodic mode"
+            default 10000000
+
+        config VESPERCSI_PLUGIN_IR_LABEL_ACTION_POLICY_PERIODIC_DEFAULT_WAIT
+            int "Default wait time between captures in periodic mode"
+            default 5000000
+
+    endif
+
+    

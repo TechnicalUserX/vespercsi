@@ -82,9 +82,14 @@ void vespercsi_plugin_load(void){
         new_context.config.set = true;
     }
 
-    vespercsi_plugin.init(&new_context);
+    if(vespercsi_plugin.init(&new_context) == VESPERCSI_FAIL){
+        fprintf(stdout, "VesperCSI: Plugin cannot be initialized");
+        dlclose(handle);
+        exit(EXIT_FAILURE);
+    }else{
+        vespercsi_plugin.loaded = true;
+    }
 
-    vespercsi_plugin.loaded = true;
     return;
 }
 

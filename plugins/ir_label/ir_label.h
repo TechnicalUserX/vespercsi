@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +9,13 @@
 #include <sys/ioctl.h>
 #include <gpiod.h>
 #include <pthread.h>
+#include <stdatomic.h>
+#include <libconfig.h>
+#include <sys/uio.h>
+#include <errno.h>
+#include <time.h>
+#include <string.h>
+#include <stdbool.h>
 
 #ifdef  CONFIG_VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
     #define LIRC_DEV CONFIG_VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
@@ -52,74 +60,124 @@
 #endif
 
 
-// Command Values
+// Capture Control
 
-#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_START_CAPTURE_VALUE
-    #define ACTION_WALK_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_START_CAPTURE_VALUE
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_START_CAPTURE
+    #define COMMAND_START_CAPTURE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_START_CAPTURE
 #else
-    #define ACTION_WALK_VALUE 0xAA
+    #define COMMAND_START_CAPTURE 0xAA
 #endif
 
-#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_WALK_VALUE
-    #define ACTION_WALK_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_WALK_VALUE
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_STOP_CAPTURE
+    #define COMMAND_STOP_CAPTURE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_STOP_CAPTURE
 #else
-    #define ACTION_WALK_VALUE 0xAA
+    #define COMMAND_STOP_CAPTURE 0xA2
 #endif
 
-#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_RUN_VALUE
-    #define ACTION_RUN_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_RUN_VALUE
+
+// Action Values
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_WALK
+    #define COMMAND_SET_ACTION_WALK CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_WALK
 #else
-    #define ACTION_RUN_VALUE 0xBB
+    #define COMMAND_SET_ACTION_WALK 0xA3
 #endif
 
-#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_JUMP_VALUE
-    #define ACTION_JUMP_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_JUMP_VALUE
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_RUN
+    #define COMMAND_SET_ACTION_RUN CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_RUN
 #else
-    #define ACTION_JUMP_VALUE 0xCC
+    #define COMMAND_SET_ACTION_RUN 0xB4
 #endif
 
-#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_STILL_VALUE
-    #define ACTION_STILL_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_STILL_VALUE
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_JUMP
+    #define COMMAND_SET_ACTION_JUMP CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_JUMP
 #else
-    #define ACTION_STILL_VALUE 0xDD
+    #define COMMAND_SET_ACTION_JUMP 0xCC
 #endif
 
-#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_SITDOWN_VALUE
-    #define ACTION_SITDOWN_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_SITDOWN_VALUE
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STILL
+    #define COMMAND_SET_ACTION_STILL CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STILL
 #else
-    #define ACTION_SITDOWN_VALUE 0xEE
+    #define COMMAND_SET_ACTION_STILL 0xDD
 #endif
 
-#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_STANDUP_VALUE
-    #define ACTION_STANDUP_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_STANDUP_VALUE
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITDOWN
+    #define COMMAND_SET_ACTION_SITDOWN CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITDOWN
 #else
-    #define ACTION_STANDUP_VALUE 0xFF
+    #define COMMAND_SET_ACTION_SITDOWN 0xEE
 #endif
 
-#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_FALL_VALUE
-    #define ACTION_FALL_VALUE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_FALL_VALUE
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STANDUP
+    #define COMMAND_SET_ACTION_STANDUP CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STANDUP
 #else
-    #define ACTION_FALL_VALUE 0x00
+    #define COMMAND_SET_ACTION_STANDUP 0xFF
 #endif
 
-typedef enum command_t{
-    COMMAND_UNKNOWN,
-    COMMAND_START_CAPTURE,
-    COMMAND_STOP_CAPTURE,
-    COMMAND_SET_ACTION_WALK,
-    COMMAND_SET_ACTION_RUN,
-    COMMAND_SET_ACTION_JUMP,
-    COMMAND_SET_ACTION_STILL,
-    COMMAND_SET_ACTION_SITDOWN,
-    COMMAND_SET_ACTION_STANDUP,
-    COMMAND_SET_ACTION_FALL
-}command_t;
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_FALL
+    #define COMMAND_SET_ACTION_FALL CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_FALL
+#else
+    #define COMMAND_SET_ACTION_FALL 0x00
+#endif
+
+// Default Action Policy
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_POLICY_PERIODIC_DEFAULT_DURATION
+    #define ACTION_POLICY_PERIODIC_DEFAULT_DURATION CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_POLICY_PERIODIC_DEFAULT_DURATION
+#else
+    #define ACTION_POLICY_PERIODIC_DEFAULT_DURATION 10000000
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_POLICY_PERIODIC_DEFAULT_WAIT
+    #define ACTION_POLICY_PERIODIC_DEFAULT_WAIT CONFIG_VESPERCSI_PLUGIN_IR_LABEL_ACTION_POLICY_PERIODIC_DEFAULT_WAIT
+#else
+    #define ACTION_POLICY_PERIODIC_DEFAULT_WAIT 5000000
+#endif
+
+
+
+typedef uint32_t label_t;
+typedef uint8_t command_t;
+
+typedef enum action_t{
+    ACTION_WALK = 0,
+    ACTION_RUN,
+    ACTION_JUMP,
+    ACTION_STILL,
+    ACTION_SITDOWN,
+    ACTION_STANDUP,
+    ACTION_FALL,
+    ACTION_UNKNOWN
+}action_t;
+
+typedef struct action_policy_t{
+    bool is_periodic; // If not periodic, then it is continuous
+    // If periodic:
+    uint64_t action_duration; // Action duration, valid time interval for recording
+    uint64_t action_wait; // Time to wait between each recordings
+}action_policy_t;
+
+extern action_policy_t action_policies[7];
+
+typedef struct ir_label_header_t{
+    uint64_t label;
+    uint64_t index;
+}ir_label_header_t;
 
 typedef struct ir_label_state_t{
-    uint64_t current_label_code;
-    bool recording;
-    bool shutdown_signal;
-    
+
+    int out_fd;
+    char out_path[512];
+
+    struct{
+        _Atomic(uint64_t) index;
+        atomic_bool is_recording;
+        atomic_bool is_periodic;
+        atomic_bool enable;
+        sig_atomic_t stop_periodic_signal;
+    }capture;
+
+    sig_atomic_t shutdown_signal;
+
     struct{
         int fd;
     }lirc;
@@ -132,10 +190,16 @@ typedef struct ir_label_state_t{
     }gpio;
 
     struct{
-        command_t previous;
-        command_t current;
+        uint8_t previous;
+        uint8_t current;
     }command;
 
+    struct{
+        action_t active;
+    }action;
+
     pthread_t infrared_runner_thread;
+    pthread_t periodic_runner_thread;
 
 }ir_label_state_t;
+
