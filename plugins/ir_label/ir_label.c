@@ -4,7 +4,7 @@
 
 vespercsi_plugin_context_t vespercsi_plugin_context;
 ir_label_state_t state;
-action_policy_t action_policies[7] = {0};
+action_policy_t action_policies[8] = {0};
 
 static inline void buzzer_sequence_input(void){
     gpiod_line_set_value(state.gpio.line_buzzer, 1);
@@ -13,7 +13,6 @@ static inline void buzzer_sequence_input(void){
 }
 
 static inline void buzzer_sequence_capture_start(void){
-
     gpiod_line_set_value(state.gpio.line_buzzer, 1);
     usleep(1000);
     gpiod_line_set_value(state.gpio.line_buzzer, 0);
@@ -110,7 +109,8 @@ label_t action_to_label(action_t action){
         case ACTION_STILL:      return 4;
         case ACTION_STANDUP:    return 5;
         case ACTION_SITDOWN:    return 6;
-        case ACTION_FALL:       return 7;
+        case ACTION_SITSTAND:   return 7;
+        case ACTION_FALL:       return 8;
         case ACTION_UNKNOWN:    return 0;
     }
 }
@@ -124,6 +124,7 @@ action_t command_to_action(command_t cmd){
         case COMMAND_SET_ACTION_STILL:      return ACTION_STILL;
         case COMMAND_SET_ACTION_STANDUP:    return ACTION_STANDUP;
         case COMMAND_SET_ACTION_SITDOWN:    return ACTION_SITDOWN;
+        case COMMAND_SET_ACTION_SITSTAND:   return ACTION_SITSTAND;
         case COMMAND_SET_ACTION_FALL:       return ACTION_FALL;
         default:                            return ACTION_UNKNOWN;
     }
@@ -135,18 +136,21 @@ void* periodic_runner(void* arg){
     uint64_t action_duration;
     uint64_t action_wait;
 
-    if(action_policies[state.action.active].action_duration > 0){
-        action_duration = action_policies[state.action.active].action_duration;
+    if(action_policies[state.action.current].action_duration > 0){
+        action_duration = action_policies[state.action.current].action_duration;
     }else{
         action_duration = ACTION_POLICY_PERIODIC_DEFAULT_DURATION;
     }
 
-    if(action_policies[state.action.active].action_wait > 0){
-        action_wait = action_policies[state.action.active].action_wait;
+    if(action_policies[state.action.current].action_wait > 0){
+        action_wait = action_policies[state.action.current].action_wait;
     }else{
         action_wait = ACTION_POLICY_PERIODIC_DEFAULT_WAIT;
     }
 
+    if(state.action.current == ACTION_SITSTAND){
+        state.action.effective = ACTION_STANDUP;
+    }
 
     while(1){
         // 1 period
@@ -166,6 +170,14 @@ void* periodic_runner(void* arg){
         red_led_capture_about_to_start();
         red_led_capture_start();
         buzzer_sequence_capture_periodic_start();
+
+        if(state.action.current == ACTION_SITSTAND){
+            if(state.action.effective == ACTION_STANDUP){
+                state.action.effective = ACTION_SITDOWN;
+            }else{
+                state.action.effective = ACTION_STANDUP;
+            }
+        }
 
         state.capture.enable = true;
 
@@ -202,7 +214,7 @@ void command_interpreter(command_t cmd){
         case COMMAND_START_CAPTURE:{
             if(state.capture.is_recording == false){
 
-                if(action_policies[state.action.active].is_periodic){
+                if(action_policies[state.action.current].is_periodic){
                     // Starting periodic action
 
                     red_led_capture_about_to_start();
@@ -265,8 +277,14 @@ void command_interpreter(command_t cmd){
 
                 if(state.command.current != state.command.previous){
 
-                    action_t action = command_to_action(state.command.current);
-                    state.action.active = action;
+                    state.action.current =  command_to_action(state.command.current);
+
+                    if(state.action.current == ACTION_SITSTAND){
+                        state.action.effective = ACTION_STANDUP;
+                    }else{
+                         state.action.effective = state.action.current;
+                    }
+
                     buzzer_sequence_action_change();
                 }
 
@@ -448,6 +466,17 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
             action_policies[ACTION_SITDOWN].action_wait = temp_int;
         }    
 
+        // Sit down and stand up
+        if(config_lookup_bool(&cfg, "action.sitstand.periodic", &temp_int)){
+            action_policies[ACTION_SITSTAND].is_periodic = temp_int;
+        }
+        if(config_lookup_bool(&cfg, "action.sitstand.duration", &temp_int)){
+            action_policies[ACTION_SITSTAND].action_duration = temp_int;
+        }
+        if(config_lookup_bool(&cfg, "action.sitstand.wait", &temp_int)){
+            action_policies[ACTION_SITSTAND].action_wait = temp_int;
+        }    
+
         // Fall
         if(config_lookup_bool(&cfg, "action.fall.periodic", &temp_int)){
             action_policies[ACTION_FALL].is_periodic = temp_int;
@@ -581,7 +610,10 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
     if(state.capture.enable){
 
         ir_label_header_t ir_label_header;
-        ir_label_header.label = action_to_label(state.action.active);
+
+        label_t current_label = 0;
+
+        ir_label_header.label = action_to_label(state.action.effective);
         ir_label_header.index = state.capture.index;
 
         struct iovec iov[3];
@@ -600,7 +632,7 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
         if(s == io_write_size){
             LOG_VERBOSE(VERBOSITY_2, INFO,"ir_label: CSI with size %ld written to file %s", io_write_size, state.out_path);
         }else{
-            LOG_VERBOSE(VERBOSITY_2, WARN, "Consume: CSI with size %ld data not written: %s", io_write_size, strerror(errno));
+            LOG_VERBOSE(VERBOSITY_2, WARN, "ir_label: CSI with size %ld data not written: %s", io_write_size, strerror(errno));
         }        
 
     }

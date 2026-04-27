@@ -113,6 +113,13 @@
     #define COMMAND_SET_ACTION_STANDUP 0xFF
 #endif
 
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITSTAND
+    #define COMMAND_SET_ACTION_SITSTAND CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITSTAND
+#else
+    #define COMMAND_SET_ACTION_SITSTAND 0xF0
+#endif
+
+
 #ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_FALL
     #define COMMAND_SET_ACTION_FALL CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_FALL
 #else
@@ -135,7 +142,8 @@
 
 
 
-typedef uint32_t label_t;
+typedef uint16_t label_t;
+
 typedef uint8_t command_t;
 
 typedef enum action_t{
@@ -145,6 +153,7 @@ typedef enum action_t{
     ACTION_STILL,
     ACTION_SITDOWN,
     ACTION_STANDUP,
+    ACTION_SITSTAND,
     ACTION_FALL,
     ACTION_UNKNOWN
 }action_t;
@@ -156,11 +165,11 @@ typedef struct action_policy_t{
     uint64_t action_wait; // Time to wait between each recordings
 }action_policy_t;
 
-extern action_policy_t action_policies[7];
+extern action_policy_t action_policies[8];
 
 typedef struct ir_label_header_t{
-    uint64_t label;
     uint64_t index;
+    uint16_t label;
 }ir_label_header_t;
 
 typedef struct ir_label_state_t{
@@ -195,7 +204,8 @@ typedef struct ir_label_state_t{
     }command;
 
     struct{
-        action_t active;
+        _Atomic(action_t) current;
+        _Atomic(action_t) effective;
     }action;
 
     pthread_t infrared_runner_thread;

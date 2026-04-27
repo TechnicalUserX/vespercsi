@@ -88,9 +88,13 @@ menuconfig VESPERCSI_PLUGIN_IR_LABEL
             hex "Set current action to sit down"
             default 0xB6
 
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITSTAND
+            hex "Set current action to sit-stand rapid mode"
+            default 0xB7
+
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_FALL
             hex "Set current action to fall"
-            default 0xB7
+            default 0xB8
 
     endif
 
@@ -102,7 +106,7 @@ menuconfig VESPERCSI_PLUGIN_IR_LABEL
     if VESPERCSI_PLUGIN_IR_LABEL_ACTIONS
 
         config VESPERCSI_PLUGIN_IR_LABEL_ACTION_POLICY_PERIODIC_DEFAULT_DURATION
-            int "Default wait time between captures in periodic mode"
+            int "Default duration for each action in periodic mode"
             default 10000000
 
         config VESPERCSI_PLUGIN_IR_LABEL_ACTION_POLICY_PERIODIC_DEFAULT_WAIT
