@@ -3,10 +3,10 @@
 #include "ir_label.h"
 
 vespercsi_plugin_context_t vespercsi_plugin_context;
-ir_label_state_t state;
+ir_label_state_t state = {0};
 action_policy_t action_policies[8] = {0};
 
-char* action_to_string(action_t action){
+const char* action_to_string(action_t action){
     switch(action){
         case ACTION_WALK:       return "WALK";
         case ACTION_RUN:        return "RUN";
@@ -16,12 +16,13 @@ char* action_to_string(action_t action){
         case ACTION_SITDOWN:    return "SITDOWN";
         case ACTION_SITSTAND:   return "SITSTAND";
         case ACTION_FALL:       return "FALL";
+        default:
         case ACTION_UNKNOWN:    return "UNKNOWN";
     }
 }
 
 static inline void set_pin(int pin, int value){
-    LOG_VERBOSE(VERBOSITY_1, INFO, "ir_label: Setting pin %d to %d", pin, value);
+    LOG_VERBOSE(VERBOSITY_2, INFO, "ir_label: Setting pin %d to %d", pin, value);
     switch(value){
         case 1:
             gpiod_line_request_set_value(state.gpio.request, pin, GPIOD_LINE_VALUE_ACTIVE);
@@ -303,6 +304,7 @@ void command_interpreter(command_t cmd){
         case COMMAND_SET_ACTION_STILL:
         case COMMAND_SET_ACTION_STANDUP:
         case COMMAND_SET_ACTION_SITDOWN:
+        case COMMAND_SET_ACTION_SITSTAND:
         case COMMAND_SET_ACTION_FALL:{
 
             if(!state.capture.is_recording){
@@ -359,7 +361,7 @@ void* infrared_runner(void* arg){
 
             // Good read, make something based on it
             command_t cmd = sc.scancode & 0xFF;
-            LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: Received command: %02X", cmd);
+            LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: Received command: 0x%02X", cmd);
             command_interpreter(cmd);
         }
 
@@ -617,13 +619,12 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         return VESPERCSI_FAIL;
     }
     
-
-
-
     if(pthread_create(&state.infrared_runner_thread, NULL, infrared_runner, NULL) != 0){
         LOG(FAIL, "ir_label: Cannot create infrared_runner thread");
         letgo_resources();
         return VESPERCSI_FAIL;
+    }else{
+        LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: Created infrared_runner thread");
     }
 
     LOG(INFO, "ir_label: Plugin initalized");
