@@ -6,89 +6,101 @@ vespercsi_plugin_context_t vespercsi_plugin_context;
 ir_label_state_t state;
 action_policy_t action_policies[8] = {0};
 
+static inline void set_pin(int pin, bool value){
+    switch(value){
+        case 1:
+            gpiod_line_request_set_value(state.gpio.request, pin, GPIOD_LINE_VALUE_ACTIVE);
+            break;
+        case 0:
+        default:
+            gpiod_line_request_set_value(state.gpio.request, pin, GPIOD_LINE_VALUE_INACTIVE);
+            break;
+    }    
+}
+
 static inline void buzzer_sequence_input(void){
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(500);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);
+    set_pin(GPIO_LINE_BUZZER, 0);
 }
 
 static inline void buzzer_sequence_capture_start(void){
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(1000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);
+    set_pin(GPIO_LINE_BUZZER, 0);
     usleep(1000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(1000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);    
+    set_pin(GPIO_LINE_BUZZER, 0);    
 }
 
 static inline void buzzer_sequence_capture_stop(void){
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(10000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);
+    set_pin(GPIO_LINE_BUZZER, 0);
     usleep(10000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);    
+    set_pin(GPIO_LINE_BUZZER, 1);    
     usleep(10000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);
+    set_pin(GPIO_LINE_BUZZER, 0);
     usleep(10000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);  
+    set_pin(GPIO_LINE_BUZZER, 1);  
     usleep(10000);
 }
 
 static inline void buzzer_sequence_action_change(void){
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(800);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);
+    set_pin(GPIO_LINE_BUZZER, 0);
     usleep(800);
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(800);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);
+    set_pin(GPIO_LINE_BUZZER, 0);
     usleep(800);
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(800);    
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);
+    set_pin(GPIO_LINE_BUZZER, 0);
 }
 
 static inline void buzzer_sequence_capture_periodic_start(void){
 
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(1000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);
+    set_pin(GPIO_LINE_BUZZER, 0);
     usleep(1000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(1000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);    
+    set_pin(GPIO_LINE_BUZZER, 0);    
 }
 
 static inline void buzzer_sequence_capture_periodic_stop(){
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);
+    set_pin(GPIO_LINE_BUZZER, 1);
     usleep(10000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 0);
+    set_pin(GPIO_LINE_BUZZER, 0);
     usleep(10000);
-    gpiod_line_set_value(state.gpio.line_buzzer, 1);    
+    set_pin(GPIO_LINE_BUZZER, 1);    
     usleep(10000);
 }
 
 static inline void red_led_capture_start(){
-    gpiod_line_set_value(state.gpio.line_led_red, 1);
+    set_pin(GPIO_LINE_LED_RED, 1);
 }
 
 static inline void red_led_capture_stop(){
-    gpiod_line_set_value(state.gpio.line_led_red, 0);
+    set_pin(GPIO_LINE_LED_RED, 0);
 }
 
 static inline void red_led_capture_about_to_start(){
-    gpiod_line_set_value(state.gpio.line_led_red, 1);
+    set_pin(GPIO_LINE_LED_RED, 1);
     usleep(200000);
-    gpiod_line_set_value(state.gpio.line_led_red, 0);
+    set_pin(GPIO_LINE_LED_RED, 0);
     usleep(800000);
-    gpiod_line_set_value(state.gpio.line_led_red, 1);
+    set_pin(GPIO_LINE_LED_RED, 1);
     usleep(200000);
-    gpiod_line_set_value(state.gpio.line_led_red, 0);
+    set_pin(GPIO_LINE_LED_RED, 0);
     usleep(800000);
-    gpiod_line_set_value(state.gpio.line_led_red, 1);
+    set_pin(GPIO_LINE_LED_RED, 1);
     usleep(200000);
-    gpiod_line_set_value(state.gpio.line_led_red, 0);
+    set_pin(GPIO_LINE_LED_RED, 0);
     usleep(800000);    
 }
 
@@ -334,20 +346,8 @@ void* infrared_runner(void* arg){
 
 void letgo_resources(void){
 
-    if(state.gpio.line_led_red){
-        gpiod_line_release(state.gpio.line_led_red);
-    }
-
-    if(state.gpio.line_led_rgb[0]){
-        gpiod_line_release(state.gpio.line_led_rgb[0]);
-    }
-
-    if(state.gpio.line_led_rgb[1]){
-        gpiod_line_release(state.gpio.line_led_rgb[1]);
-    }
-
-    if(state.gpio.line_led_rgb[2]){
-        gpiod_line_release(state.gpio.line_led_rgb[2]);
+    if(state.gpio.request){
+        gpiod_line_request_release(state.gpio.request);
     }
 
     if(state.gpio.chip){
@@ -523,6 +523,9 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     //==========================================================//
     //======================= GPIO Setup =======================//
 
+//==========================================================//
+    //======================= GPIO Setup =======================//
+
     state.gpio.chip = gpiod_chip_open(GPIO_DEV);
     if (!state.gpio.chip) {
         LOG(FAIL, "ir_label: GPIO device %s cannot be opened", GPIO_DEV);
@@ -530,71 +533,68 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         return VESPERCSI_FAIL;
     }
 
-    state.gpio.line_led_red = gpiod_chip_get_line( state.gpio.chip, GPIO_LINE_LED_RED);
-    if(!state.gpio.line_led_red){
-        LOG(FAIL, "ir_label: GPIO line for red led cannot be retrieved");
-        letgo_resources();
-        return VESPERCSI_FAIL;
-    }
-
-    state.gpio.line_led_rgb[0] = gpiod_chip_get_line( state.gpio.chip, GPIO_LINE_LED_RGB_RED);
-    if(!state.gpio.line_led_rgb[0]){
-        LOG(FAIL, "ir_label: GPIO line for rgb led (red) cannot be retrieved");
-        letgo_resources();
-        return VESPERCSI_FAIL;
-    }
-
-    state.gpio.line_led_rgb[1] = gpiod_chip_get_line( state.gpio.chip, GPIO_LINE_LED_RGB_GREEN);
-    if(!state.gpio.line_led_rgb[1]){
-        LOG(FAIL, "ir_label: GPIO line for rgb led (green) cannot be retrieved");
-        letgo_resources();
-        return VESPERCSI_FAIL;
-    }
-
-    state.gpio.line_led_rgb[2] = gpiod_chip_get_line( state.gpio.chip, GPIO_LINE_LED_RGB_BLUE);
-    if(!state.gpio.line_led_rgb[2]){
-        LOG(FAIL, "ir_label: GPIO line for rgb led (blue) cannot be retrieved");
-        letgo_resources();
-        return VESPERCSI_FAIL;
-    }
-
-    state.gpio.line_buzzer = gpiod_chip_get_line( state.gpio.chip, GPIO_LINE_BUZZER);
-    if(!state.gpio.line_buzzer){
-        LOG(FAIL, "ir_label: GPIO line for buzzer cannot be retrieved");
-        letgo_resources();
-        return VESPERCSI_FAIL;
-    }
-
-    if (gpiod_line_request_output(state.gpio.line_led_red, "vespercsi-plugin-ir-label", 0) < 0) {
-        LOG(FAIL, "ir_label: GPIO line for red led cannot be set to output mode");
-        letgo_resources();
-        return VESPERCSI_FAIL;
-    }
-
-    if (gpiod_line_request_output(state.gpio.line_led_rgb[0], "vespercsi-plugin-ir-label", 0) < 0) {
-        LOG(FAIL, "ir_label: GPIO line for RGB led (Red) cannot be set to output mode");
-        letgo_resources();
-        return VESPERCSI_FAIL;
-    }
-
-    if (gpiod_line_request_output(state.gpio.line_led_rgb[1], "vespercsi-plugin-ir-label", 0) < 0) {
-        LOG(FAIL, "ir_label: GPIO line for RGB led (Green) cannot be set to output mode");
-        letgo_resources();
-        return VESPERCSI_FAIL;
-    }    
-
-    if (gpiod_line_request_output(state.gpio.line_led_rgb[2], "vespercsi-plugin-ir-label", 0) < 0) {
-        LOG(FAIL, "ir_label: GPIO line for RGB led (Blue) cannot be set to output mode");
+    // 1. Create a generic settings profile for an Output line initialized to 0 (Inactive)
+    struct gpiod_line_settings *settings = gpiod_line_settings_new();
+    if(!settings){
+        LOG(FAIL, "ir_label: Cannot create GPIO line settings");
         letgo_resources();
         return VESPERCSI_FAIL;
     }
     
-    if (gpiod_line_request_output(state.gpio.line_buzzer, "vespercsi-plugin-ir-label", 0) < 0) {
-        LOG(FAIL, "ir_label: GPIO line for buzzer cannot be set to output mode");
+    gpiod_line_settings_set_direction(settings, GPIOD_LINE_DIRECTION_OUTPUT);
+    gpiod_line_settings_set_output_value(settings, GPIOD_LINE_VALUE_INACTIVE);
+
+    // 2. Map the settings to the specific offsets you intend to use
+    struct gpiod_line_config *line_cfg = gpiod_line_config_new();
+    if(!line_cfg){
+        LOG(FAIL, "ir_label: Cannot create GPIO line config");
+        gpiod_line_settings_free(settings);
+        letgo_resources();
+        return VESPERCSI_FAIL;
+    }
+
+    unsigned int offsets[] = {
+        GPIO_LINE_LED_RED, 
+        GPIO_LINE_BUZZER
+    };
+
+    if(gpiod_line_config_add_line_settings(line_cfg, offsets, 2, settings) != 0){
+        LOG(FAIL, "ir_label: Cannot add GPIO line settings to config");
+        gpiod_line_config_free(line_cfg);
+        gpiod_line_settings_free(settings);
+        letgo_resources();
+        return VESPERCSI_FAIL;
+    }
+
+    // 3. Set standard request metadata (like the consumer string)
+    struct gpiod_request_config *req_cfg = gpiod_request_config_new();
+    if(!req_cfg){
+        LOG(FAIL, "ir_label: Cannot create GPIO request config");
+        gpiod_line_config_free(line_cfg);
+        gpiod_line_settings_free(settings);
         letgo_resources();
         return VESPERCSI_FAIL;
     }
     
+    gpiod_request_config_set_consumer(req_cfg, "vespercsi-plugin-ir-label");
+
+    // 4. Submit the request to reserve all the lines at once
+    state.gpio.request = gpiod_chip_request_lines(state.gpio.chip, req_cfg, line_cfg);
+
+    // 5. Free the configuration boilerplate (it is no longer needed after the request)
+    gpiod_request_config_free(req_cfg);
+    gpiod_line_config_free(line_cfg);
+    gpiod_line_settings_free(settings);
+
+    if(!state.gpio.request){
+        LOG(FAIL, "ir_label: Cannot request GPIO lines");
+        letgo_resources();
+        return VESPERCSI_FAIL;
+    }
+    
+
+
+
     if(pthread_create(&state.infrared_runner_thread, NULL, infrared_runner, NULL) != 0){
         LOG(FAIL, "ir_label: Cannot create infrared_runner thread");
         letgo_resources();
