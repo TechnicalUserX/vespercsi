@@ -6,7 +6,22 @@ vespercsi_plugin_context_t vespercsi_plugin_context;
 ir_label_state_t state;
 action_policy_t action_policies[8] = {0};
 
-static inline void set_pin(int pin, bool value){
+char* action_to_string(action_t action){
+    switch(action){
+        case ACTION_WALK:       return "WALK";
+        case ACTION_RUN:        return "RUN";
+        case ACTION_JUMP:       return "JUMP";
+        case ACTION_STILL:      return "STILL";
+        case ACTION_STANDUP:    return "STANDUP";
+        case ACTION_SITDOWN:    return "SITDOWN";
+        case ACTION_SITSTAND:   return "SITSTAND";
+        case ACTION_FALL:       return "FALL";
+        case ACTION_UNKNOWN:    return "UNKNOWN";
+    }
+}
+
+static inline void set_pin(int pin, int value){
+    LOG_VERBOSE(VERBOSITY_1, INFO, "ir_label: Setting pin %d to %d", pin, value);
     switch(value){
         case 1:
             gpiod_line_request_set_value(state.gpio.request, pin, GPIOD_LINE_VALUE_ACTIVE);
@@ -228,6 +243,7 @@ void command_interpreter(command_t cmd){
 
                 if(action_policies[state.action.current].is_periodic){
                     // Starting periodic action
+                    LOG(INFO, "ir_label: Starting periodic capture...");
 
                     red_led_capture_about_to_start();
                     buzzer_sequence_capture_start();
@@ -242,6 +258,8 @@ void command_interpreter(command_t cmd){
 
                 }else{
                     // Starting continuous action
+                    LOG(INFO, "ir_label: Starting continuous capture...");
+
                     red_led_capture_start();
                     buzzer_sequence_capture_start();
 
@@ -259,11 +277,15 @@ void command_interpreter(command_t cmd){
 
                 if(state.capture.is_periodic){
                     // Periodic
+                    LOG(INFO, "ir_label: Stopping periodic capture...");
                     state.capture.stop_periodic_signal = true;
                     pthread_join(state.periodic_runner_thread, NULL);
 
                 }else{
                     // Continuous
+                    LOG(INFO, "ir_label: Stopping continuous capture...");
+
+
                     state.capture.is_recording = false;
                     state.capture.enable = false;
                     state.capture.index++; // After every stop, we increase the index by one
@@ -288,7 +310,7 @@ void command_interpreter(command_t cmd){
                 state.command.current = cmd;
 
                 if(state.command.current != state.command.previous){
-
+                    LOG(INFO, "ir_label: Changing action to %s", action_to_string(state.command.current));
                     state.action.current =  command_to_action(state.command.current);
 
                     if(state.action.current == ACTION_SITSTAND){
@@ -337,6 +359,7 @@ void* infrared_runner(void* arg){
 
             // Good read, make something based on it
             command_t cmd = sc.scancode & 0xFF;
+            LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: Received command: %02X", cmd);
             command_interpreter(cmd);
         }
 
