@@ -128,7 +128,8 @@ typedef uint16_t label_t;
 typedef uint8_t command_t;
 
 typedef enum action_t{
-    ACTION_WALK = 0,
+    ACTION_UNKNOWN = 0,
+    ACTION_WALK,
     ACTION_RUN,
     ACTION_JUMP,
     ACTION_STILL,
@@ -136,7 +137,6 @@ typedef enum action_t{
     ACTION_STANDUP,
     ACTION_SITSTAND,
     ACTION_FALL,
-    ACTION_UNKNOWN
 }action_t;
 
 typedef struct action_policy_t{
@@ -148,7 +148,7 @@ typedef struct action_policy_t{
     uint64_t action_hold; // Amount of time to wait before beginning 
 }action_policy_t;
 
-extern action_policy_t action_policies[8];
+extern action_policy_t action_policies[9];
 
 typedef struct ir_label_header_t{
     uint64_t index;
@@ -158,9 +158,27 @@ typedef struct ir_label_header_t{
 typedef struct ir_label_state_t{
 
     struct{
+
         int fd;
         char directory[512];
-        bool include_timestamp;
+        char full_path[1024];
+
+        struct{
+            bool timestamp;
+            bool action;
+            struct{
+                bool prefix;
+                bool suffix;
+            }custom;
+
+            bool index;
+        }include;
+
+        struct{
+            char prefix[512];
+            char suffix[512];
+        }custom;
+
     }out;
 
     struct{

@@ -4,10 +4,11 @@
 vespercsi_plugin_context_t vespercsi_plugin_context = {0};
 
 ir_label_state_t state = {
-    .action = {ACTION_WALK, ACTION_WALK}
+    .action = {ACTION_WALK, ACTION_WALK},
+    .out.directory = "."
 };
 
-action_policy_t action_policies[8] = {0};
+action_policy_t action_policies[9] = {0};
 
 const char* action_to_string(action_t action){
     switch(action){
@@ -401,7 +402,7 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         strncat(absolute_path, temp_str, available);
         available -= strnlen(temp_str, available);
 
-        if(state.out.include_timestamp){
+        if(state.out.include.timestamp){
 
             time_t raw_time;
             struct tm *info = NULL;
@@ -427,7 +428,6 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     }
 
     // Action Policy Configuration //
-
 
     // Walk
     if(config_lookup_bool(&cfg, "action.walk.periodic", &temp_int)){
@@ -716,7 +716,7 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
             ssize_t s = writev(state.out.fd, iov, 3);
 
             if(s == io_write_size){
-                LOG_VERBOSE(VERBOSITY_2, INFO,"ir_label: CSI with size %ld written to file %s", io_write_size, state.out.path);
+                LOG_VERBOSE(VERBOSITY_2, INFO,"ir_label: CSI with size %ld written to file %s", io_write_size, state.out.full_path);
             }else{
                 LOG_VERBOSE(VERBOSITY_2, WARN, "ir_label: CSI with size %ld data not written: %s", io_write_size, strerror(errno));
             }
