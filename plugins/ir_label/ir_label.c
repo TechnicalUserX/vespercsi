@@ -611,6 +611,8 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     const char* temp_str = NULL;
     long long temp_int64;
 
+    // out.* config
+
     if(config_lookup_string(&state.config_file, "out.directory", &temp_str)){
 
         char directory_path[PATH_MAX] = {0};
@@ -646,6 +648,39 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     
     }
 
+    if(config_lookup_bool(&state.config_file, "out.timestamp", &temp_int)){
+        state.out.include.timestamp = temp_int;
+    }
+
+    if(config_lookup_bool(&state.config_file, "out.datetime", &temp_int)){
+        state.out.include.datetime = temp_int;
+    }     
+    
+    if(config_lookup_bool(&state.config_file, "out.action", &temp_int)){
+        state.out.include.action = temp_int;
+    }    
+
+    if(config_lookup_string(&state.config_file, "out.prefix", &temp_str)){
+        strlcpy(state.out.prefix, temp_str, sizeof(state.out.prefix));
+        state.out.include.prefix = true;
+    }
+
+    if(config_lookup_string(&state.config_file, "out.suffix", &temp_str)){
+        strlcpy(state.out.suffix, temp_str, sizeof(state.out.suffix));
+        state.out.include.suffix = true;
+    }
+
+    if(config_lookup_string(&state.config_file, "out.extension", &temp_str)){
+        strlcpy(state.out.extension, temp_str, sizeof(state.out.extension));
+        state.out.include.extension = true;
+    }
+
+    if(config_lookup_bool(&state.config_file, "out.index", &temp_int)){
+        state.out.include.index = temp_int;
+    } 
+
+    // capture.* config
+
     if(config_lookup_bool(&state.config_file, "capture.index_autoincrement", &temp_int)){
         state.capture.index_autoincrement = temp_int;
     }
@@ -654,7 +689,7 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         state.capture.index = temp_int64;
     }    
 
-    // Action Policy Configuration //
+    // action.* config //
 
     // Walk
     if(config_lookup_bool(&state.config_file, "action.walk.periodic", &temp_int)){
@@ -664,7 +699,7 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         state.action.policies[ACTION_WALK].action_duration = temp_int64;
     }
     if(config_lookup_int64(&state.config_file, "action.walk.wait", &temp_int64)){
-        state.action.policies[ACTION_WALK].action_wait = temp_int;
+        state.action.policies[ACTION_WALK].action_wait = temp_int64;
     }
     if(config_lookup_bool(&state.config_file, "action.walk.hold", &temp_int)){
         state.action.policies[ACTION_WALK].action_hold = temp_int;
@@ -731,10 +766,10 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         state.action.policies[ACTION_STANDUP].is_periodic = temp_int;
     }
     if(config_lookup_int64(&state.config_file, "action.standup.duration", &temp_int64)){
-        state.action.policies[ACTION_STANDUP].action_duration = temp_int;
+        state.action.policies[ACTION_STANDUP].action_duration = temp_int64;
     }
     if(config_lookup_int64(&state.config_file, "action.standup.wait", &temp_int64)){
-        state.action.policies[ACTION_STANDUP].action_wait = temp_int;
+        state.action.policies[ACTION_STANDUP].action_wait = temp_int64;
     }     
     if(config_lookup_bool(&state.config_file, "action.standup.hold", &temp_int)){
         state.action.policies[ACTION_STANDUP].action_hold = temp_int;
