@@ -571,19 +571,23 @@ void free_resources(void){
 
     if(state.gpio.request){
         gpiod_line_request_release(state.gpio.request);
+        state.gpio.request = NULL;
     }
 
     if(state.gpio.chip){
         gpiod_chip_close(state.gpio.chip);
+        state.gpio.chip = NULL;
     }
 
     if(state.lirc.fd > 0){
         close(state.lirc.fd);
+        state.lirc.fd = -1;
     }
 
     pthread_mutex_lock(&state.out.fd_lock);
     if (state.out.fd >= 0){
         close(state.out.fd);
+        state.out.fd = -1;
     }    
     pthread_mutex_unlock(&state.out.fd_lock);
 }
@@ -1064,7 +1068,8 @@ int vespercsi_plugin_function_destroy(void){
         state.shutdown_signal = true;
         pthread_join(state.infrared_runner_thread, NULL);
     }
-
+    
+    pthread_mutex_destroy(&state.out.fd_lock);
     free_resources();
     LOG(INFO, "ir_label: Plugin destroyed");
     return VESPERCSI_OK;
