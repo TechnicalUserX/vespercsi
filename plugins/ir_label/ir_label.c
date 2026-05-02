@@ -331,7 +331,7 @@ void* capture_periodic_runner(void* arg){
         buzzer_sequence_hold();
     }
 
-    while((!counter || counter--) || !state.shutdown_signal){
+    while(!counter || counter--){
         // 1 period
 
         if(state.capture.stop_periodic_signal){
