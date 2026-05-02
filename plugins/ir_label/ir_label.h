@@ -17,6 +17,9 @@
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
+#include <limits.h>
+#include <inttypes.h>
+#include <sys/stat.h>
 
 #ifdef  CONFIG_VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
     #define LIRC_DEV CONFIG_VESPERCSI_PLUGIN_IR_LABEL_LIRC_DEV
@@ -56,37 +59,37 @@
     #define COMMAND_STOP_CAPTURE 0x01
 #endif
 
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_DISCARD_CAPTURE
+    #define COMMAND_DISCARD_CAPTURE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_DISCARD_CAPTURE
+#else
+    #define COMMAND_DISCARD_CAPTURE 0x02
+#endif
+
 
 // Action Values
 
 #ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_WALK
     #define COMMAND_SET_ACTION_WALK CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_WALK
 #else
-    #define COMMAND_SET_ACTION_WALK 0x02
+    #define COMMAND_SET_ACTION_WALK 0x03
 #endif
 
 #ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_RUN
     #define COMMAND_SET_ACTION_RUN CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_RUN
 #else
-    #define COMMAND_SET_ACTION_RUN 0x03
+    #define COMMAND_SET_ACTION_RUN 0x04
 #endif
 
 #ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_JUMP
     #define COMMAND_SET_ACTION_JUMP CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_JUMP
 #else
-    #define COMMAND_SET_ACTION_JUMP 0x04
+    #define COMMAND_SET_ACTION_JUMP 0x05
 #endif
 
 #ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STILL
     #define COMMAND_SET_ACTION_STILL CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STILL
 #else
-    #define COMMAND_SET_ACTION_STILL 0x05
-#endif
-
-#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITDOWN
-    #define COMMAND_SET_ACTION_SITDOWN CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITDOWN
-#else
-    #define COMMAND_SET_ACTION_SITDOWN 0x06
+    #define COMMAND_SET_ACTION_STILL 0x06
 #endif
 
 #ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STANDUP
@@ -95,17 +98,42 @@
     #define COMMAND_SET_ACTION_STANDUP 0x07
 #endif
 
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITDOWN
+    #define COMMAND_SET_ACTION_SITDOWN CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITDOWN
+#else
+    #define COMMAND_SET_ACTION_SITDOWN 0x08
+#endif
+
 #ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITSTAND
     #define COMMAND_SET_ACTION_SITSTAND CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITSTAND
 #else
-    #define COMMAND_SET_ACTION_SITSTAND 0x08
+    #define COMMAND_SET_ACTION_SITSTAND 0x09
 #endif
 
 #ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_FALL
     #define COMMAND_SET_ACTION_FALL CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_FALL
 #else
-    #define COMMAND_SET_ACTION_FALL 0x09
+    #define COMMAND_SET_ACTION_FALL 0x10
 #endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_INCREASE
+    #define COMMAND_CAPTURE_INDEX_INCREASE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_INCREASE
+#else
+    #define COMMAND_CAPTURE_INDEX_INCREASE 0x11
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_DECREASE
+    #define COMMAND_CAPTURE_INDEX_DECREASE CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_DECREASE
+#else
+    #define COMMAND_CAPTURE_INDEX_DECREASE 0x12
+#endif
+
+#ifdef CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_TOGGLE_AUTOINCREMENT
+    #define COMMAND_CAPTURE_INDEX_TOGGLE_AUTOINCREMENT CONFIG_VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_TOGGLE_AUTOINCREMENT
+#else
+    #define COMMAND_CAPTURE_INDEX_TOGGLE_AUTOINCREMENT 0x13
+#endif
+
 
 // Default Action Policy
 
@@ -121,7 +149,32 @@
     #define ACTION_POLICY_PERIODIC_DEFAULT_WAIT 5000000
 #endif
 
+#define SLEEP_MILISECONDS(ms) usleep(1000*(ms))
 
+/*
+    Buzzer Sequences
+
+    Any/Invalid Input: B-100 G-50
+
+    Capture Hold: B-500 G-500 B-500 G-500 B-500 G-500
+
+    Capture Start: (Also periodic indicator): B-100 G-50 B-100 G-50 
+    Capture Wait: B-100 G-50
+
+    Capture Stop: B-400 G-100 B-150 G-100
+
+    Action Change: B-50 G-50 B-50 G-50
+
+
+    Each period must include it's own index during the capture start-stop session
+    A single file record contains either a continuous or a periodic action, after start
+    let it be WALK or JUMP, it is periodic or continuous, but this does not affect writing operation in general.
+    A single file cannot contain multiple action types, only one, for example WALK.
+
+    WALK operation is chosen, if continuous, then the index does not change during the action, but if it is periodic,
+    index is incremented by one after each period is complete. This is for internal usage.
+
+*/
 
 typedef uint16_t label_t;
 
@@ -148,8 +201,6 @@ typedef struct action_policy_t{
     uint64_t action_hold; // Amount of time to wait before beginning 
 }action_policy_t;
 
-extern action_policy_t action_policies[9];
-
 typedef struct ir_label_header_t{
     uint64_t index;
     uint16_t label;
@@ -157,36 +208,38 @@ typedef struct ir_label_header_t{
 
 typedef struct ir_label_state_t{
 
+    config_t config_file;
+
     struct{
 
         int fd;
-        char directory[512];
-        char full_path[1024];
+        char fd_path[PATH_MAX];
+        pthread_mutex_t fd_lock;
+
+        char directory[PATH_MAX];
+        char prefix[NAME_MAX];
+        char suffix[NAME_MAX];
+        char extension[NAME_MAX];
 
         struct{
             bool timestamp;
+            bool datetime;
             bool action;
-            struct{
-                bool prefix;
-                bool suffix;
-            }custom;
-
+            bool prefix;
+            bool suffix;
+            bool extension;
             bool index;
         }include;
 
-        struct{
-            char prefix[512];
-            char suffix[512];
-        }custom;
 
     }out;
 
     struct{
-        _Atomic(uint64_t) index;
         atomic_bool is_recording;
-        atomic_bool is_periodic;
         atomic_bool enable;
         sig_atomic_t stop_periodic_signal;
+        uint64_t index;
+        bool index_autoincrement;
     }capture;
 
     sig_atomic_t shutdown_signal;
@@ -208,10 +261,12 @@ typedef struct ir_label_state_t{
     struct{
         _Atomic(action_t) current;
         _Atomic(action_t) effective;
+        action_policy_t policies[9];
+        uint64_t index[9];
     }action;
 
     pthread_t infrared_runner_thread;
-    pthread_t periodic_runner_thread;
+    pthread_t capture_periodic_runner_thread;
 
 }ir_label_state_t;
 

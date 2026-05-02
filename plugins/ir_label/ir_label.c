@@ -3,12 +3,27 @@
 
 vespercsi_plugin_context_t vespercsi_plugin_context = {0};
 
-ir_label_state_t state = {
-    .action = {ACTION_WALK, ACTION_WALK},
-    .out.directory = "."
-};
+ir_label_state_t state = {0};
 
-action_policy_t action_policies[9] = {0};
+int state_init(void){
+    state.action.current = ACTION_WALK;
+    state.action.effective = ACTION_WALK;
+    state.out.fd = -1;
+
+    state.infrared_runner_thread = -1;
+    state.capture_periodic_runner_thread = -1;
+    if(pthread_mutex_init(&state.out.fd_lock, NULL) != 0){
+        return VESPERCSI_FAIL;
+    }
+
+    return VESPERCSI_OK;
+}
+
+static inline uint64_t wallclock_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
+}
 
 const char* action_to_string(action_t action){
     switch(action){
@@ -23,6 +38,136 @@ const char* action_to_string(action_t action){
         default:
         case ACTION_UNKNOWN:    return "UNKNOWN";
     }
+}
+
+const char* generate_new_record_file_name(void){
+    static char buffer[PATH_MAX] = {0};
+    memset(buffer, 0x0, sizeof(buffer));
+    strcpy(buffer, "csi");
+    uint64_t ts = 0;
+
+    if(state.out.include.datetime || state.out.include.timestamp){
+        ts = wallclock_us();
+    }
+
+    if(state.out.include.prefix){
+        strlcat(buffer, "_", PATH_MAX);
+        strlcat(buffer, state.out.prefix, PATH_MAX);
+    }
+
+    if(state.out.include.datetime){
+        strlcat(buffer, "_", PATH_MAX);
+        char dt_buffer[64] = {0};        
+        time_t seconds = (time_t)(ts / (uint64_t)1000000);
+        struct tm tm_info = {0};
+        localtime_r(&seconds, &tm_info);
+        strftime(dt_buffer, sizeof(dt_buffer), "%Y%m%d%H%M%S", &tm_info);
+        strlcat(buffer, dt_buffer, PATH_MAX);
+    }
+
+    if(state.out.include.timestamp){
+        strlcat(buffer, "_", PATH_MAX);
+        char ts_buffer[32] = {0};
+        snprintf(ts_buffer, sizeof(ts_buffer), "%" PRIu64, ts);
+        strlcat(buffer, ts_buffer, PATH_MAX);
+    }
+
+    if(state.out.include.action){
+        strlcat(buffer, "_", PATH_MAX);
+        strlcat(buffer, action_to_string(state.action.effective), PATH_MAX);
+    }
+
+    if(state.out.include.index){
+        // This the current index of the current action, reset at each run
+        strlcat(buffer, "_", PATH_MAX);
+        char index_buffer[32] = {0};
+        snprintf(index_buffer, 32, "%" PRIu64, state.capture.index);
+        strlcat(buffer, index_buffer, PATH_MAX);
+    }
+
+    if(state.out.include.suffix){
+        strlcat(buffer, "_", PATH_MAX);
+        strlcat(buffer, state.out.suffix, PATH_MAX);
+    }
+
+    if(state.out.include.extension){
+        strlcat(buffer, ".", PATH_MAX);
+        strlcat(buffer, state.out.extension, PATH_MAX);
+    }    
+
+    return buffer;
+}
+
+const char* generate_new_record_path(void){
+
+    static char record_path[PATH_MAX] = {0};
+    memset(record_path, 0x0, sizeof(record_path));
+
+
+    if(strlen(state.out.directory) > 0){
+        strlcat(record_path, state.out.directory, PATH_MAX);
+    }
+
+    const char* new_record_file_name = generate_new_record_file_name();
+
+    if(new_record_file_name == NULL){
+        LOG(FAIL, "ir_label: Cannot create a record file name");
+        return NULL;
+    }
+
+    strlcat(record_path, new_record_file_name, PATH_MAX);
+
+    return record_path;
+}
+
+int open_out(void){
+
+    const char* record_path = generate_new_record_path();
+    
+    if(record_path == NULL){
+        return VESPERCSI_FAIL;
+    }
+
+    int fd = open(record_path, O_CREAT | O_APPEND | O_WRONLY, 0644);
+
+    if(fd < 0){
+        LOG_VERBOSE(VERBOSITY_0, FAIL, "Cannot open output file %s", record_path);
+        return VESPERCSI_FAIL;
+    }
+
+
+    pthread_mutex_lock(&state.out.fd_lock);
+    state.out.fd = fd;
+    strlcpy(state.out.fd_path, record_path, PATH_MAX);
+    pthread_mutex_unlock(&state.out.fd_lock);
+
+    return VESPERCSI_OK;
+}
+
+int close_out(bool discard){
+
+    pthread_mutex_lock(&state.out.fd_lock);
+
+    if(state.out.fd >= 0){
+        close(state.out.fd);
+        if(discard){
+            if(remove(state.out.fd_path) != 0){
+                LOG(WARN, "ir_label: Cannot discard the file: %s", state.out.fd_path);
+            }else{
+                LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: File discarded: %s", state.out.fd_path);
+            }
+        }else{
+            if(state.out.include.index && state.capture.index_autoincrement){
+                state.capture.index++;
+            }
+        }
+        strlcpy(state.out.fd_path, "", PATH_MAX);
+        state.out.fd = -1;
+    }
+
+    pthread_mutex_unlock(&state.out.fd_lock);
+
+    return VESPERCSI_OK;
 }
 
 static inline void set_pin(int pin, int value){
@@ -40,47 +185,66 @@ static inline void set_pin(int pin, int value){
 
 static inline void buzzer_sequence_input(void){
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(5000);
+    SLEEP_MILISECONDS(100);
     set_pin(GPIO_LINE_BUZZER, 0);
+    SLEEP_MILISECONDS(50);
 }
 
 static inline void buzzer_sequence_capture_start(void){
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(10000);
+    SLEEP_MILISECONDS(100);
     set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(10000);
+    SLEEP_MILISECONDS(50);
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(10000);
-    set_pin(GPIO_LINE_BUZZER, 0);    
+    SLEEP_MILISECONDS(100);
+    set_pin(GPIO_LINE_BUZZER, 0);
+    SLEEP_MILISECONDS(50);
 }
 
 static inline void buzzer_sequence_capture_stop(void){
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(10000);
+    SLEEP_MILISECONDS(400);
     set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(10000);
+    SLEEP_MILISECONDS(100);
     set_pin(GPIO_LINE_BUZZER, 1);    
-    usleep(10000);
+    SLEEP_MILISECONDS(150);
     set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(10000);
-    set_pin(GPIO_LINE_BUZZER, 1);  
-    usleep(10000);
-    set_pin(GPIO_LINE_BUZZER, 0);
+    SLEEP_MILISECONDS(100);
+}
 
+static inline void buzzer_sequence_capture_wait(void){
+    set_pin(GPIO_LINE_BUZZER, 1);
+    SLEEP_MILISECONDS(200);
+    set_pin(GPIO_LINE_BUZZER, 0);
+    SLEEP_MILISECONDS(50);
 }
 
 static inline void buzzer_sequence_action_change(void){
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(8000);
+    SLEEP_MILISECONDS(50);
     set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(8000);
+    SLEEP_MILISECONDS(50);
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(8000);
+    SLEEP_MILISECONDS(50);
     set_pin(GPIO_LINE_BUZZER, 0);
-    usleep(8000);
+    SLEEP_MILISECONDS(50);
+
+}
+
+static inline void buzzer_sequence_hold(void){
     set_pin(GPIO_LINE_BUZZER, 1);
-    usleep(8000);    
+    SLEEP_MILISECONDS(500);
     set_pin(GPIO_LINE_BUZZER, 0);
+    SLEEP_MILISECONDS(500);
+    set_pin(GPIO_LINE_BUZZER, 1);
+    SLEEP_MILISECONDS(500);
+    set_pin(GPIO_LINE_BUZZER, 0);
+    SLEEP_MILISECONDS(500);
+    set_pin(GPIO_LINE_BUZZER, 1);
+    SLEEP_MILISECONDS(500);
+    set_pin(GPIO_LINE_BUZZER, 0);
+    SLEEP_MILISECONDS(500);
+
 }
 
 static inline void red_led_capture_start(){
@@ -89,27 +253,6 @@ static inline void red_led_capture_start(){
 
 static inline void red_led_capture_stop(){
     set_pin(GPIO_LINE_LED_RED, 0);
-}
-
-static inline void red_led_capture_about_to_start(){
-    set_pin(GPIO_LINE_LED_RED, 1);
-    usleep(200000);
-    set_pin(GPIO_LINE_LED_RED, 0);
-    usleep(800000);
-    set_pin(GPIO_LINE_LED_RED, 1);
-    usleep(200000);
-    set_pin(GPIO_LINE_LED_RED, 0);
-    usleep(800000);
-    set_pin(GPIO_LINE_LED_RED, 1);
-    usleep(200000);
-    set_pin(GPIO_LINE_LED_RED, 0);
-    usleep(800000);    
-}
-
-static inline uint64_t wallclock_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
 }
 
 label_t action_to_label(action_t action){
@@ -142,19 +285,29 @@ action_t command_to_action(command_t cmd){
     }
 }
 
-void* periodic_runner(void* arg){
+void action_sitstand_swap(void){
+    if(state.action.current == ACTION_SITSTAND){
+        if(state.action.effective == ACTION_STANDUP){
+            state.action.effective = ACTION_SITDOWN;
+        }else{
+            state.action.effective = ACTION_STANDUP;
+        }
+    }
+}
 
-    uint64_t action_duration;
-    uint64_t action_wait;
+void* capture_periodic_runner(void* arg){
 
-    if(action_policies[state.action.current].action_duration > 0){
-        action_duration = action_policies[state.action.current].action_duration;
+    uint64_t action_duration = 0;
+    uint64_t action_wait = 0;
+
+    if(state.action.policies[state.action.current].action_duration > 0){
+        action_duration = state.action.policies[state.action.current].action_duration;
     }else{
         action_duration = ACTION_POLICY_PERIODIC_DEFAULT_DURATION;
     }
 
-    if(action_policies[state.action.current].action_wait > 0){
-        action_wait = action_policies[state.action.current].action_wait;
+    if(state.action.policies[state.action.current].action_wait > 0){
+        action_wait = state.action.policies[state.action.current].action_wait;
     }else{
         action_wait = ACTION_POLICY_PERIODIC_DEFAULT_WAIT;
     }
@@ -163,116 +316,144 @@ void* periodic_runner(void* arg){
         state.action.effective = ACTION_STANDUP;
     }
 
-    while(1){
+    uint64_t counter = 0;
+
+    if(state.action.policies[state.action.current].action_count > 0){
+        counter = state.action.policies[state.action.current].action_count;
+    }
+
+    if(state.action.policies[state.action.current].action_hold){
+        buzzer_sequence_hold();
+    }
+
+    while((!counter || counter--) || !state.shutdown_signal){
         // 1 period
 
         if(state.capture.stop_periodic_signal){
-            state.capture.stop_periodic_signal = false;
             pthread_exit(NULL);
         }
 
-        uint64_t start_time;
-        uint64_t current_time;
-
+        uint64_t start_time = 0;
+        uint64_t current_time = 0;
 
         start_time = wallclock_us();
 
-
-        red_led_capture_about_to_start();
         red_led_capture_start();
         buzzer_sequence_capture_start();
 
-        if(state.action.current == ACTION_SITSTAND){
-            if(state.action.effective == ACTION_STANDUP){
-                state.action.effective = ACTION_SITDOWN;
-            }else{
-                state.action.effective = ACTION_STANDUP;
-            }
-        }
+        action_sitstand_swap();
 
         state.capture.enable = true;
 
         do{
+            if(state.capture.stop_periodic_signal){
+                break;
+            }            
             current_time = wallclock_us();
-            usleep(100);
+            SLEEP_MILISECONDS(10);
         }while(current_time - start_time < action_duration);
 
 
-        
         state.capture.enable = false;
 
         red_led_capture_stop();
-        buzzer_sequence_capture_stop();
+        buzzer_sequence_capture_wait();
 
         start_time = wallclock_us();
 
         do{
+            if(state.capture.stop_periodic_signal){
+                break;
+            }
             current_time = wallclock_us();
-            usleep(100);
+            SLEEP_MILISECONDS(10);
         }while(current_time - start_time < action_wait);        
 
-        state.capture.index++;
+        state.action.index[state.action.effective]++;
 
     }
+
+    return NULL;
+}
+
+void start_capture_continuous(void){
+    LOG(INFO, "ir_label: Starting continuous capture...");
+    
+    red_led_capture_start();
+    buzzer_sequence_capture_start();
+
+    state.action.index[state.action.effective] = 0;
+    state.capture.is_recording = true;
+    state.capture.enable = true;
+}
+
+void stop_capture_continuous(void){
+    LOG(INFO, "ir_label: Stopping continuous capture...");
+    state.capture.is_recording = false;
+    state.capture.enable = false;
+    state.action.index[state.action.effective] = 0;
+}
+
+void start_capture_periodic(void){
+    LOG(INFO, "ir_label: Starting periodic capture...");
+
+    red_led_capture_start();
+    buzzer_sequence_capture_start();
+
+    state.action.index[state.action.effective] = 0;
+    state.capture.is_recording = true;
+
+    if(pthread_create(&state.capture_periodic_runner_thread, NULL, capture_periodic_runner, NULL) != 0){
+        LOG(FAIL, "ir_label: Cannot create capture_periodic_runner thread");
+        return;
+    }         
+}
+
+void stop_capture_periodic(void){
+    LOG(INFO, "ir_label: Stopping periodic capture...");
+
+    state.capture.stop_periodic_signal = true;
+    pthread_join(state.capture_periodic_runner_thread, NULL);
+    state.action.index[state.action.effective] = 0;
+    state.capture.stop_periodic_signal = false;
 }
 
 void command_interpreter(command_t cmd){
 
-    buzzer_sequence_input();
+    state.command.current = cmd;
 
     switch(cmd){
 
         case COMMAND_START_CAPTURE:{
             if(state.capture.is_recording == false){
 
-                if(action_policies[state.action.current].is_periodic){
-                    // Starting periodic action
-                    LOG(INFO, "ir_label: Starting periodic capture...");
-
-                    red_led_capture_about_to_start();
-                    buzzer_sequence_capture_start();
-                    
-                    state.capture.is_periodic = true;
-                    state.capture.is_recording = true;
-
-                    if(pthread_create(&state.periodic_runner_thread, NULL, periodic_runner, NULL) != 0){
-                        LOG(FAIL, "ir_label: Cannot create periodic_runner thread");
-                        return;
-                    }                    
-
-                }else{
-                    // Starting continuous action
-                    LOG(INFO, "ir_label: Starting continuous capture...");
-
-                    red_led_capture_start();
-                    buzzer_sequence_capture_start();
-
-                    state.capture.is_recording = true;
-                    state.capture.is_periodic = false;
-                    state.capture.enable = true;
-
+                if(open_out() == VESPERCSI_FAIL){
+                    LOG(WARN, "Cannot open a file for writing CSI data");
+                    break;
                 }
 
+                if(state.action.policies[state.action.current].is_periodic){
+                    start_capture_periodic();
+                }else{
+                    start_capture_continuous();
+                }
             }
         }break;
 
+        case COMMAND_DISCARD_CAPTURE:
         case COMMAND_STOP_CAPTURE:{
             if(state.capture.is_recording == true){
 
-                if(state.capture.is_periodic){
-                    // Periodic
-                    LOG(INFO, "ir_label: Stopping periodic capture...");
-                    state.capture.stop_periodic_signal = true;
-                    pthread_join(state.periodic_runner_thread, NULL);
-
+                if(state.action.policies[state.action.current].is_periodic){
+                    stop_capture_periodic();
                 }else{
-                    // Continuous
-                    LOG(INFO, "ir_label: Stopping continuous capture...");
+                    stop_capture_continuous();
+                }
 
-
-                    state.capture.is_recording = false;
-                    state.capture.enable = false;
-                    state.capture.index++; // After every stop, we increase the index by one
+                if(cmd == COMMAND_DISCARD_CAPTURE){
+                    close_out(true);
+                }else{
+                    close_out(false);
                 }
 
                 red_led_capture_stop();
@@ -292,8 +473,6 @@ void command_interpreter(command_t cmd){
 
             if(!state.capture.is_recording){
 
-                state.command.current = cmd;
-
                 if(state.command.current != state.command.previous){
 
                     state.action.current =  command_to_action(state.command.current);
@@ -309,17 +488,43 @@ void command_interpreter(command_t cmd){
                     buzzer_sequence_action_change();
                 }
 
-                state.command.previous = state.command.current;
             }
 
         }break;
 
+        case COMMAND_CAPTURE_INDEX_INCREASE:{
+            state.capture.index++;
+            LOG(INFO, "ir_label: Capture index increased to %" PRIu64, state.capture.index);
+        }break;
+
+        case COMMAND_CAPTURE_INDEX_DECREASE:{
+            if(state.capture.index > 0){
+                state.capture.index--;
+                LOG(INFO, "ir_label: Capture index increased to %" PRIu64, state.capture.index);
+            }
+        }break;
+
+        case COMMAND_CAPTURE_INDEX_TOGGLE_AUTOINCREMENT:{
+            if(state.capture.index_autoincrement){
+                state.capture.index_autoincrement = false;
+                LOG(INFO, "ir_label: Capture index mode set to: manual");
+            }else{
+                state.capture.index_autoincrement = true;
+                LOG(INFO, "ir_label: Capture index mode set to: autoincrement");
+            }
+        }break;
+
+        default:{
+            buzzer_sequence_input();
+        }break;
+        
     }
 
+    state.command.previous = state.command.current;
 }
 
-// This thread changes the internal state of the plugin based on infrared remote input
 void* infrared_runner(void* arg){
+    // This thread changes the internal state of the plugin based on infrared remote input
 
     struct pollfd pfd = { .fd = state.lirc.fd, .events = POLLIN };
 
@@ -333,7 +538,8 @@ void* infrared_runner(void* arg){
 
         int p = poll(&pfd, 1, 200);
 
-        if(p == 0){
+        if(p == 0){ 
+            // Timeout
             continue;
         }else if(pfd.revents & POLLIN){
             // There is data in the infrared receiver
@@ -346,7 +552,9 @@ void* infrared_runner(void* arg){
 
             // Good read, make something based on it
             command_t cmd = sc.scancode & 0xFF;
+
             LOG_VERBOSE(VERBOSITY_1, DEBG, "ir_label: Received command: 0x%02X", cmd);
+            
             command_interpreter(cmd);
         }
 
@@ -354,7 +562,7 @@ void* infrared_runner(void* arg){
 
 }
 
-void letgo_resources(void){
+void free_resources(void){
 
     if(state.gpio.request){
         gpiod_line_request_release(state.gpio.request);
@@ -368,215 +576,227 @@ void letgo_resources(void){
         close(state.lirc.fd);
     }
 
-    if (state.out.fd > 0){
+    pthread_mutex_lock(&state.out.fd_lock);
+    if (state.out.fd >= 0){
         close(state.out.fd);
     }    
+    pthread_mutex_unlock(&state.out.fd_lock);
 }
 
 int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     vespercsi_plugin_context = *context;
 
+    if(state_init() == VESPERCSI_FAIL){
+        LOG(FAIL, "ir_label: Cannot set initial state");
+        free_resources();
+        return VESPERCSI_FAIL;
+    }
+
     if(!context->config.set){
         LOG(FAIL, "ir_label: Config file needed");
+        free_resources();
         return VESPERCSI_FAIL;
     }
 
     // Configuration file set //
-    config_t cfg = {0};
 
-    if(!config_read_file(&cfg, context->config.path)){
-        LOG(FAIL, "ir_label: config error: %s (line %d)\n", config_error_text(&cfg), config_error_line(&cfg));
-        letgo_resources();
-        config_destroy(&cfg);
+    if(!config_read_file(&state.config_file, context->config.path)){
+        LOG(FAIL, "ir_label: config error: %s (line %d)\n", config_error_text(&state.config_file), config_error_line(&state.config_file));
+        free_resources();
+        config_destroy(&state.config_file);
         return VESPERCSI_FAIL;
     }
 
     int temp_int = 0;
     const char* temp_str = NULL;
+    long long temp_int64;
 
-    if(config_lookup_string(&cfg, "out.directory", &temp_str)){
+    if(config_lookup_string(&state.config_file, "out.directory", &temp_str)){
 
-        char absolute_path[512] = {0};
-        uint64_t available = 511;
+        char directory_path[PATH_MAX] = {0};
 
-        strncat(absolute_path, temp_str, available);
-        available -= strnlen(temp_str, available);
+        strlcat(directory_path, temp_str, PATH_MAX);
 
-        if(state.out.include.timestamp){
-
-            time_t raw_time;
-            struct tm *info = NULL;
-            char buffer[80] = {0};
-            time(&raw_time);
-
-            info = localtime(&raw_time);            
-            strftime(buffer, 512, "%Y%m%d%H%M%S", info);
-
+        if(access(directory_path, W_OK | X_OK) == 0){
+            LOG_VERBOSE(VERBOSITY_1, DEBG, "ir_label: Permissions are sufficient: %s",directory_path);
+        }else{
+            LOG(FAIL, "ir_label: Cannot access %s, permission denied", directory_path);
         }
-        
-        state.out.fd = open(temp_str, O_CREAT | O_APPEND | O_WRONLY, 0644);
 
-        if(state.out.fd < 0){
-            LOG(FAIL, "ir_label: Cannot open file: %s: %s", temp_str, strerror(errno));
+        struct stat directory_path_stat = {0};
+        stat(directory_path, &directory_path_stat);
+
+        if(S_ISDIR(directory_path_stat.st_mode)) {
+            LOG_VERBOSE(VERBOSITY_1, DEBG, "ir_label: Directory exists: %s",directory_path);
+        }else{
+            LOG(FAIL, "ir_label: %s is not a directory", directory_path);
             return VESPERCSI_FAIL;
         }
 
-        strncpy(state.out.directory, temp_str, sizeof(state.out.directory)-1);
+        uint64_t len = strlen(directory_path);
+        if(directory_path[len-1] != '/' && strlen(directory_path) < PATH_MAX - 1){
+            directory_path[len] = '/';
+            directory_path[len+1] = '\0';
+        }else{
+            LOG(FAIL, "ir_label: Directory name too large for buffer to include a file name at the end");
+            return VESPERCSI_FAIL;
+        }
+
+        strlcpy(state.out.directory, directory_path, PATH_MAX);
     
-    }else{
-        state.out.fd = -1;
     }
+
+    if(config_lookup_bool(&state.config_file, "capture.index_autoincrement", &temp_int)){
+        state.capture.index_autoincrement = temp_int;
+    }
+
+    if(config_lookup_int64(&state.config_file, "capture.index", &temp_int64)){
+        state.capture.index = temp_int64;
+    }    
 
     // Action Policy Configuration //
 
     // Walk
-    if(config_lookup_bool(&cfg, "action.walk.periodic", &temp_int)){
-        action_policies[ACTION_WALK].is_periodic = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.walk.periodic", &temp_int)){
+        state.action.policies[ACTION_WALK].is_periodic = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.walk.duration", &temp_int)){
-        action_policies[ACTION_WALK].action_duration = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.walk.duration", &temp_int64)){
+        state.action.policies[ACTION_WALK].action_duration = temp_int64;
     }
-    if(config_lookup_bool(&cfg, "action.walk.wait", &temp_int)){
-        action_policies[ACTION_WALK].action_wait = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.walk.wait", &temp_int64)){
+        state.action.policies[ACTION_WALK].action_wait = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.walk.hold", &temp_int)){
-        action_policies[ACTION_WALK].action_hold = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.walk.hold", &temp_int)){
+        state.action.policies[ACTION_WALK].action_hold = temp_int;
     }   
-    if(config_lookup_bool(&cfg, "action.walk.count", &temp_int)){
-        action_policies[ACTION_WALK].action_count = temp_int;
-    }         
+    if(config_lookup_int64(&state.config_file, "action.walk.count", &temp_int64)){
+        state.action.policies[ACTION_WALK].action_count = temp_int64;
+    }
+
 
     // Run
-    if(config_lookup_bool(&cfg, "action.run.periodic", &temp_int)){
-        action_policies[ACTION_RUN].is_periodic = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.run.periodic", &temp_int)){
+        state.action.policies[ACTION_RUN].is_periodic = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.run.duration", &temp_int)){
-        action_policies[ACTION_RUN].action_duration = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.run.duration", &temp_int64)){
+        state.action.policies[ACTION_RUN].action_duration = temp_int64;
     }
-    if(config_lookup_bool(&cfg, "action.run.wait", &temp_int)){
-        action_policies[ACTION_RUN].action_wait = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.run.wait", &temp_int64)){
+        state.action.policies[ACTION_RUN].action_wait = temp_int64;
     }        
-    if(config_lookup_bool(&cfg, "action.run.hold", &temp_int)){
-        action_policies[ACTION_RUN].action_hold = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.run.hold", &temp_int)){
+        state.action.policies[ACTION_RUN].action_hold = temp_int;
     }   
-    if(config_lookup_bool(&cfg, "action.run.count", &temp_int)){
-        action_policies[ACTION_RUN].action_count = temp_int;
-    } 
+    if(config_lookup_int64(&state.config_file, "action.run.count", &temp_int64)){
+        state.action.policies[ACTION_RUN].action_count = temp_int64;
+    }
 
 
     // Jump
-    if(config_lookup_bool(&cfg, "action.jump.periodic", &temp_int)){
-        action_policies[ACTION_JUMP].is_periodic = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.jump.periodic", &temp_int)){
+        state.action.policies[ACTION_JUMP].is_periodic = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.jump.duration", &temp_int)){
-        action_policies[ACTION_JUMP].action_duration = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.jump.duration", &temp_int64)){
+        state.action.policies[ACTION_JUMP].action_duration = temp_int64;
     }
-    if(config_lookup_bool(&cfg, "action.jump.wait", &temp_int)){
-        action_policies[ACTION_JUMP].action_wait = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.jump.wait", &temp_int64)){
+        state.action.policies[ACTION_JUMP].action_wait = temp_int64;
     }            
-    if(config_lookup_bool(&cfg, "action.jump.hold", &temp_int)){
-        action_policies[ACTION_JUMP].action_hold = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.jump.hold", &temp_int)){
+        state.action.policies[ACTION_JUMP].action_hold = temp_int;
     }   
-    if(config_lookup_bool(&cfg, "action.jump.count", &temp_int)){
-        action_policies[ACTION_JUMP].action_count = temp_int;
-    } 
-
+    if(config_lookup_int64(&state.config_file, "action.jump.count", &temp_int64)){
+        state.action.policies[ACTION_JUMP].action_count = temp_int64;
+    }
 
     // Still
-    if(config_lookup_bool(&cfg, "action.still.periodic", &temp_int)){
-        action_policies[ACTION_STILL].is_periodic = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.still.periodic", &temp_int)){
+        state.action.policies[ACTION_STILL].is_periodic = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.still.duration", &temp_int)){
-        action_policies[ACTION_STILL].action_duration = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.still.duration", &temp_int64)){
+        state.action.policies[ACTION_STILL].action_duration = temp_int64;
     }
-    if(config_lookup_bool(&cfg, "action.still.wait", &temp_int)){
-        action_policies[ACTION_STILL].action_wait = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.still.wait", &temp_int64)){
+        state.action.policies[ACTION_STILL].action_wait = temp_int64;
     }     
-    if(config_lookup_bool(&cfg, "action.still.hold", &temp_int)){
-        action_policies[ACTION_STILL].action_hold = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.still.hold", &temp_int)){
+        state.action.policies[ACTION_STILL].action_hold = temp_int;
     }   
-    if(config_lookup_bool(&cfg, "action.still.count", &temp_int)){
-        action_policies[ACTION_STILL].action_count = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.still.count", &temp_int64)){
+        state.action.policies[ACTION_STILL].action_count = temp_int64;
     }
 
     // Stand up
-    if(config_lookup_bool(&cfg, "action.standup.periodic", &temp_int)){
-        action_policies[ACTION_STANDUP].is_periodic = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.standup.periodic", &temp_int)){
+        state.action.policies[ACTION_STANDUP].is_periodic = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.standup.duration", &temp_int)){
-        action_policies[ACTION_STANDUP].action_duration = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.standup.duration", &temp_int64)){
+        state.action.policies[ACTION_STANDUP].action_duration = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.standup.wait", &temp_int)){
-        action_policies[ACTION_STANDUP].action_wait = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.standup.wait", &temp_int64)){
+        state.action.policies[ACTION_STANDUP].action_wait = temp_int;
     }     
-    if(config_lookup_bool(&cfg, "action.standup.hold", &temp_int)){
-        action_policies[ACTION_STANDUP].action_hold = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.standup.hold", &temp_int)){
+        state.action.policies[ACTION_STANDUP].action_hold = temp_int;
     }   
-    if(config_lookup_bool(&cfg, "action.standup.count", &temp_int)){
-        action_policies[ACTION_STANDUP].action_count = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.standup.count", &temp_int64)){
+        state.action.policies[ACTION_STANDUP].action_count = temp_int64;
     }
 
 
     // Sit down
-    if(config_lookup_bool(&cfg, "action.sitdown.periodic", &temp_int)){
-        action_policies[ACTION_SITDOWN].is_periodic = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.sitdown.periodic", &temp_int)){
+        state.action.policies[ACTION_SITDOWN].is_periodic = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.sitdown.duration", &temp_int)){
-        action_policies[ACTION_SITDOWN].action_duration = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.sitdown.duration", &temp_int64)){
+        state.action.policies[ACTION_SITDOWN].action_duration = temp_int64;
     }
-    if(config_lookup_bool(&cfg, "action.sitdown.wait", &temp_int)){
-        action_policies[ACTION_SITDOWN].action_wait = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.sitdown.wait", &temp_int64)){
+        state.action.policies[ACTION_SITDOWN].action_wait = temp_int64;
     }    
-    if(config_lookup_bool(&cfg, "action.sitdown.hold", &temp_int)){
-        action_policies[ACTION_SITDOWN].action_hold = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.sitdown.hold", &temp_int)){
+        state.action.policies[ACTION_SITDOWN].action_hold = temp_int;
     }   
-    if(config_lookup_bool(&cfg, "action.sitdown.count", &temp_int)){
-        action_policies[ACTION_SITDOWN].action_count = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.sitdown.count", &temp_int64)){
+        state.action.policies[ACTION_SITDOWN].action_count = temp_int64;
     }
 
     // Sit down and stand up
-    if(config_lookup_bool(&cfg, "action.sitstand.periodic", &temp_int)){
-        action_policies[ACTION_SITSTAND].is_periodic = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.sitstand.periodic", &temp_int)){
+        state.action.policies[ACTION_SITSTAND].is_periodic = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.sitstand.duration", &temp_int)){
-        action_policies[ACTION_SITSTAND].action_duration = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.sitstand.duration", &temp_int64)){
+        state.action.policies[ACTION_SITSTAND].action_duration = temp_int64;
     }
-    if(config_lookup_bool(&cfg, "action.sitstand.wait", &temp_int)){
-        action_policies[ACTION_SITSTAND].action_wait = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.sitstand.wait", &temp_int64)){
+        state.action.policies[ACTION_SITSTAND].action_wait = temp_int64;
     }    
-    if(config_lookup_bool(&cfg, "action.sitstand.hold", &temp_int)){
-        action_policies[ACTION_SITSTAND].action_hold = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.sitstand.hold", &temp_int)){
+        state.action.policies[ACTION_SITSTAND].action_hold = temp_int;
     }   
-    if(config_lookup_bool(&cfg, "action.sitstand.count", &temp_int)){
-        action_policies[ACTION_SITSTAND].action_count = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.sitstand.count", &temp_int64)){
+        state.action.policies[ACTION_SITSTAND].action_count = temp_int64;
     }
-
 
     // Fall
-    if(config_lookup_bool(&cfg, "action.fall.periodic", &temp_int)){
-        action_policies[ACTION_FALL].is_periodic = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.fall.periodic", &temp_int)){
+        state.action.policies[ACTION_FALL].is_periodic = temp_int;
     }
-    if(config_lookup_bool(&cfg, "action.fall.duration", &temp_int)){
-        action_policies[ACTION_FALL].action_duration = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.fall.duration", &temp_int64)){
+        state.action.policies[ACTION_FALL].action_duration = temp_int64;
     }
-    if(config_lookup_bool(&cfg, "action.fall.wait", &temp_int)){
-        action_policies[ACTION_FALL].action_wait = temp_int;
+    if(config_lookup_int64(&state.config_file, "action.fall.wait", &temp_int64)){
+        state.action.policies[ACTION_FALL].action_wait = temp_int64;
     }
-    if(config_lookup_bool(&cfg, "action.fall.hold", &temp_int)){
-        action_policies[ACTION_FALL].action_hold = temp_int;
-    }   
-    if(config_lookup_bool(&cfg, "action.fall.count", &temp_int)){
-        action_policies[ACTION_FALL].action_count = temp_int;
+    if(config_lookup_bool(&state.config_file, "action.fall.hold", &temp_int)){
+        state.action.policies[ACTION_FALL].action_hold = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.fall.count", &temp_int64)){
+        state.action.policies[ACTION_FALL].action_count = temp_int64;
     }
 
 
-
-
-
-
-
-    config_destroy(&cfg);
-
+    config_destroy(&state.config_file);
 
     //==========================================================//
     //==================== Infrared Setup ======================//
@@ -591,30 +811,29 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     unsigned int mode = LIRC_MODE_SCANCODE;
     if (ioctl(state.lirc.fd, LIRC_SET_REC_MODE, &mode) < 0) {
         LOG(FAIL, "ir_label: ioctl LIRC_SET_REC_MODE failed");
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
-    }    
+    }
 
     if (ioctl(state.lirc.fd, LIRC_GET_REC_MODE, &mode) < 0) {
         LOG(FAIL, "ir_label: ioctl LIRC_GET_REC_MODE failed");
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
     }
 
     if(mode != LIRC_MODE_SCANCODE){
         LOG(FAIL, "ir_label: mode is not set to LIRC_MODE_SCANCODE");
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
     }
 
     //==========================================================//
     //======================= GPIO Setup =======================//
 
-
     state.gpio.chip = gpiod_chip_open(GPIO_DEV);
     if (!state.gpio.chip) {
         LOG(FAIL, "ir_label: GPIO device %s cannot be opened", GPIO_DEV);
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
     }
 
@@ -622,7 +841,7 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     struct gpiod_line_settings *settings = gpiod_line_settings_new();
     if(!settings){
         LOG(FAIL, "ir_label: Cannot create GPIO line settings");
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
     }
     
@@ -634,7 +853,7 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(!line_cfg){
         LOG(FAIL, "ir_label: Cannot create GPIO line config");
         gpiod_line_settings_free(settings);
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
     }
 
@@ -647,7 +866,7 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         LOG(FAIL, "ir_label: Cannot add GPIO line settings to config");
         gpiod_line_config_free(line_cfg);
         gpiod_line_settings_free(settings);
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
     }
 
@@ -657,7 +876,7 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         LOG(FAIL, "ir_label: Cannot create GPIO request config");
         gpiod_line_config_free(line_cfg);
         gpiod_line_settings_free(settings);
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
     }
     
@@ -673,13 +892,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
 
     if(!state.gpio.request){
         LOG(FAIL, "ir_label: Cannot request GPIO lines");
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
     }
-    
+
     if(pthread_create(&state.infrared_runner_thread, NULL, infrared_runner, NULL) != 0){
         LOG(FAIL, "ir_label: Cannot create infrared_runner thread");
-        letgo_resources();
+        free_resources();
         return VESPERCSI_FAIL;
     }else{
         LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: Created infrared_runner thread");
@@ -692,17 +911,25 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
 int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
 
     if(state.capture.enable){
+        // Critical Area //
+
+        int lock_attempt = pthread_mutex_trylock(&state.out.fd_lock);
+        if(lock_attempt == EBUSY){
+            return VESPERCSI_OK;
+        }else if(lock_attempt == EINVAL){
+            return VESPERCSI_FAIL;
+        }
 
         ir_label_header_t ir_label_header = {0};
 
         label_t current_label = 0;
 
         ir_label_header.label = action_to_label(state.action.effective);
-        ir_label_header.index = state.capture.index;
+        ir_label_header.index =  state.action.index[state.action.effective];
 
-        if(state.out.fd > 0){
+        if(state.out.fd >= 0){
 
-            struct iovec iov[3];
+            struct iovec iov[3] = {0};
 
             iov[0].iov_base = (void*)&ir_label_header;
             iov[0].iov_len = sizeof(ir_label_header);
@@ -711,20 +938,65 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
             iov[2].iov_base = (void*)&csi->data.csi_data;
             iov[2].iov_len  = csi->header.csi_data_size;
 
-            size_t io_write_size = iov[0].iov_len + iov[1].iov_len + iov[2].iov_len; 
 
-            ssize_t s = writev(state.out.fd, iov, 3);
+            size_t total_to_write = iov[0].iov_len + iov[1].iov_len + iov[2].iov_len;
+            size_t remaining = total_to_write;
 
-            if(s == io_write_size){
-                LOG_VERBOSE(VERBOSITY_2, INFO,"ir_label: CSI with size %ld written to file %s", io_write_size, state.out.full_path);
-            }else{
-                LOG_VERBOSE(VERBOSITY_2, WARN, "ir_label: CSI with size %ld data not written: %s", io_write_size, strerror(errno));
+            // Variables to track which vectors to send next
+            int current_iov_index = 0;
+            int current_iov_count = 3;
+
+            while (remaining > 0 && current_iov_index < 3) {
+                // Write starting from the first unwritten (or partially written) vector
+                ssize_t written = writev(state.out.fd, &iov[current_iov_index], current_iov_count);
+
+                if (written < 0) {
+                    if (errno == EINTR) {
+                        // System call was interrupted by a signal before any data was written; try again
+                        continue;
+                    }
+                    LOG_VERBOSE(VERBOSITY_2, WARN, "ir_label: Fatal write error: %s", strerror(errno));
+                    break; 
+                }
+
+                if (written == 0) {
+                    // EOF or disk full scenario, stop attempting to write
+                    LOG_VERBOSE(VERBOSITY_2, WARN, "ir_label: writev returned 0 (No space left?)");
+                    break;
+                }
+
+                remaining -= written;
+
+                // Advance the iovec structures based on how many bytes were actually written
+                size_t bytes_accounted_for = (size_t)written;
+                
+                    while (bytes_accounted_for > 0 && current_iov_index < 3) {
+                        if (iov[current_iov_index].iov_len <= bytes_accounted_for) {
+                            // This entire vector was successfully written
+                            bytes_accounted_for -= iov[current_iov_index].iov_len;
+                            current_iov_index++;  // Move to the next vector
+                            current_iov_count--;  // We have one less vector to process
+                        } else {
+                            // This vector was only partially written. 
+                            // Adjust its base pointer and length for the next writev call.
+                            iov[current_iov_index].iov_base = (uint8_t*)iov[current_iov_index].iov_base + bytes_accounted_for;
+                            iov[current_iov_index].iov_len -= bytes_accounted_for;
+                            bytes_accounted_for = 0; // All written bytes are accounted for
+                        }
+                    }
             }
 
+            if (remaining > 0) {
+                LOG_VERBOSE(VERBOSITY_2, WARN, "ir_label: CSI partial write failure. %zu bytes lost out of %zu", remaining, total_to_write);
+            } else {
+                LOG_VERBOSE(VERBOSITY_2, INFO,"ir_label: CSI with size %zu written to file: %s", total_to_write, state.out.fd_path);
+            }
+
+        //         
         }
 
-
-
+        pthread_mutex_unlock(&state.out.fd_lock);
+    // Capture Enabled
     }
 
     return VESPERCSI_OK;
@@ -733,10 +1005,18 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
 int vespercsi_plugin_function_destroy(void){
 
     LOG_VERBOSE(VERBOSITY_1, INFO, "ir_label: Stopping infrared_runner thread");
-    state.shutdown_signal = true;
-    pthread_join(state.infrared_runner_thread, NULL);
 
+    if(state.capture_periodic_runner_thread != -1){
+        state.capture.stop_periodic_signal = true;
+        pthread_join(state.capture_periodic_runner_thread, NULL);
+    }
 
+    if(state.infrared_runner_thread != -1){
+        state.shutdown_signal = true;
+        pthread_join(state.infrared_runner_thread, NULL);
+    }
+
+    free_resources();
     LOG(INFO, "ir_label: Plugin destroyed");
     return VESPERCSI_OK;
 }

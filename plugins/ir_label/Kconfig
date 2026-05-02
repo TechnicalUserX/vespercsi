@@ -50,39 +50,55 @@ menuconfig VESPERCSI_PLUGIN_IR_LABEL
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_STOP_CAPTURE
             hex "Stop Capture"
-            default 0x01            
-            
+            default 0x01           
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_DISCARD_CAPTURE
+            hex "Discard Capture"
+            default 0x02                
+
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_WALK
             hex "Set current action to walk"
-            default 0x02  
+            default 0x03  
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_RUN
             hex "Set current action to run"
-            default 0x03 
+            default 0x04 
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_JUMP
             hex "Set current action to jump"
-            default 0x04
+            default 0x05
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STILL
             hex "Set current action to still"
-            default 0x05
+            default 0x06
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_STANDUP
             hex "Set current action to stand up"
-            default 0x06
+            default 0x07
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITDOWN
             hex "Set current action to sit down"
-            default 0x07
+            default 0x08
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_SITSTAND
             hex "Set current action to sit-stand rapid mode"
-            default 0x08
+            default 0x09
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_FALL
             hex "Set current action to fall"
-            default 0x09
+            default 0x10
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_INCREASE
+            hex "Increase capture index (affects record file naming)"
+            default 0x11
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_DECREASE
+            hex "Decrease capture index (affects record file naming)"
+            default 0x12            
+
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_TOGGLE_AUTOINCREMENT
+            hex "Toggle capture index auto increment (affects record file naming)"
+            default 0x13
 
     endif
 
