@@ -1,3 +1,4 @@
+#include <libconfig.h>
 #include <vespercsi/plugin.h>
 #include "ir_label.h"
 
@@ -8,10 +9,14 @@ ir_label_state_t state = {0};
 int state_init(void){
     state.action.current = ACTION_WALK;
     state.action.effective = ACTION_WALK;
+
     state.out.fd = -1;
+    strlcpy(state.out.directory, ".", sizeof(state.out.directory));
 
     state.infrared_runner_thread = -1;
+
     state.capture_periodic_runner_thread = -1;
+
     if(pthread_mutex_init(&state.out.fd_lock, NULL) != 0){
         return VESPERCSI_FAIL;
     }
@@ -614,38 +619,47 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     // out.* config
 
     if(config_lookup_string(&state.config_file, "out.directory", &temp_str)){
+        strlcpy(state.out.directory, temp_str, PATH_MAX);    
+    }
 
-        char directory_path[PATH_MAX] = {0};
-
-        strlcat(directory_path, temp_str, PATH_MAX);
-
-        if(access(directory_path, W_OK | X_OK) == 0){
-            LOG_VERBOSE(VERBOSITY_1, DEBG, "ir_label: Permissions are sufficient: %s",directory_path);
+    if(strlen(state.out.directory) > 0){
+        // Directory not present, I guess we should check the default value now
+        if(access(state.out.directory, W_OK | X_OK) == 0){
+            LOG_VERBOSE(VERBOSITY_1, DEBG, "ir_label: Permissions are sufficient: %s",state.out.directory);
         }else{
-            LOG(FAIL, "ir_label: Cannot access %s, permission denied", directory_path);
+            LOG(FAIL, "ir_label: Cannot access %s, permission denied", state.out.directory);
+            config_destroy(&state.config_file);
+            free_resources();
+            return VESPERCSI_FAIL;
         }
 
         struct stat directory_path_stat = {0};
-        stat(directory_path, &directory_path_stat);
+        stat(state.out.directory, &directory_path_stat);
 
         if(S_ISDIR(directory_path_stat.st_mode)) {
-            LOG_VERBOSE(VERBOSITY_1, DEBG, "ir_label: Directory exists: %s",directory_path);
+            LOG_VERBOSE(VERBOSITY_1, DEBG, "ir_label: Directory exists: %s",state.out.directory);
         }else{
-            LOG(FAIL, "ir_label: %s is not a directory", directory_path);
+            LOG(FAIL, "ir_label: %s is not a directory", state.out.directory);
+            config_destroy(&state.config_file);
+            free_resources();            
             return VESPERCSI_FAIL;
+        }        
+
+        uint64_t len = strlen(state.out.directory);
+
+        if(state.out.directory[len-1] != '/'){
+
+            if(len < PATH_MAX - 1){
+                state.out.directory[len] = '/';
+                state.out.directory[len+1] = '\0';
+            }else{
+                LOG(FAIL, "ir_label: Directory name too large for buffer to include a file name at the end");
+                config_destroy(&state.config_file);
+                free_resources();
+                return VESPERCSI_FAIL;
+            }
         }
 
-        uint64_t len = strlen(directory_path);
-        if(directory_path[len-1] != '/' && strlen(directory_path) < PATH_MAX - 1){
-            directory_path[len] = '/';
-            directory_path[len+1] = '\0';
-        }else{
-            LOG(FAIL, "ir_label: Directory name too large for buffer to include a file name at the end");
-            return VESPERCSI_FAIL;
-        }
-
-        strlcpy(state.out.directory, directory_path, PATH_MAX);
-    
     }
 
     if(config_lookup_bool(&state.config_file, "out.timestamp", &temp_int)){
