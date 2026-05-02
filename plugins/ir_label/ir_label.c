@@ -323,15 +323,18 @@ void* capture_periodic_runner(void* arg){
 
     uint64_t counter = 0;
 
+    bool counter_enabled = false;
+
     if(state.action.policies[state.action.current].action_count > 0){
         counter = state.action.policies[state.action.current].action_count;
+        counter_enabled = true;
     }
 
     if(state.action.policies[state.action.current].action_hold){
         buzzer_sequence_hold();
     }
 
-    while(!counter || counter--){
+    while(!counter_enabled || counter > 0){
         // 1 period
 
         if(state.capture.stop_periodic_signal){
@@ -375,8 +378,10 @@ void* capture_periodic_runner(void* arg){
         }while(current_time - start_time < action_wait);        
 
         state.action.index[state.action.effective]++;
-
+        counter--;
     }
+
+    stop_capture_periodic(true);
 
     return NULL;
 }
@@ -394,6 +399,10 @@ void start_capture_continuous(void){
 
 void stop_capture_continuous(void){
     LOG(INFO, "ir_label: Stopping continuous capture...");
+
+    red_led_capture_stop();
+    buzzer_sequence_capture_stop();
+
     state.capture.is_recording = false;
     state.capture.enable = false;
     state.action.index[state.action.effective] = 0;
@@ -414,13 +423,26 @@ void start_capture_periodic(void){
     }         
 }
 
-void stop_capture_periodic(void){
+void stop_capture_periodic(bool self){
     LOG(INFO, "ir_label: Stopping periodic capture...");
 
-    state.capture.stop_periodic_signal = true;
-    pthread_join(state.capture_periodic_runner_thread, NULL);
     state.action.index[state.action.effective] = 0;
-    state.capture.stop_periodic_signal = false;
+    state.capture.is_recording = false;
+
+    red_led_capture_stop();
+    buzzer_sequence_capture_stop();
+
+    if(self){
+        close_out(false);
+        state.capture_periodic_runner_thread = -1;        
+        pthread_detach(pthread_self());
+        pthread_exit(NULL);
+    }else{
+        state.capture.stop_periodic_signal = true;
+        pthread_join(state.capture_periodic_runner_thread, NULL);
+        state.capture_periodic_runner_thread = -1;
+        state.capture.stop_periodic_signal = false;
+    }
 }
 
 void command_interpreter(command_t cmd){
@@ -450,7 +472,7 @@ void command_interpreter(command_t cmd){
             if(state.capture.is_recording == true){
 
                 if(state.action.policies[state.action.current].is_periodic){
-                    stop_capture_periodic();
+                    stop_capture_periodic(false);
                 }else{
                     stop_capture_continuous();
                 }
@@ -460,10 +482,6 @@ void command_interpreter(command_t cmd){
                 }else{
                     close_out(false);
                 }
-
-                red_led_capture_stop();
-                buzzer_sequence_capture_stop();
-
             }
         }break;
 

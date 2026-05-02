@@ -270,3 +270,4 @@ typedef struct ir_label_state_t{
 
 }ir_label_state_t;
 
+void stop_capture_periodic(bool self);
