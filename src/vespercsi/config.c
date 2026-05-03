@@ -25,7 +25,7 @@ void vespercsi_config_init(vespercsi_config_t* config){
 
     if(config_lookup_int(&cfg, "runners.capture.core", &temp_int)){
         if(temp_int < 0 || temp_int > 31){
-            fprintf(stdout, "VesperCSI: config error: invalid cpu core, valid options: 0-31");
+            fprintf(stdout, "VesperCSI: config error: invalid cpu core, valid options: 0-31\n");
             exit(EXIT_FAILURE);
         }
         vespercsi_config.runners.capture.core_set = true;
@@ -34,7 +34,7 @@ void vespercsi_config_init(vespercsi_config_t* config){
 
     if(config_lookup_int(&cfg, "runners.consume.core", &temp_int)){
         if(temp_int < 0 || temp_int > 31){
-            fprintf(stdout, "VesperCSI: config error: invalid cpu core, valid options: 0-31");
+            fprintf(stdout, "VesperCSI: config error: invalid cpu core, valid options: 0-31\n");
             exit(EXIT_FAILURE);
         }
         vespercsi_config.runners.consume.core_set = true;
@@ -43,7 +43,7 @@ void vespercsi_config_init(vespercsi_config_t* config){
 
     if(config_lookup_int(&cfg, "runners.capture.priority", &temp_int)){
         if(temp_int < 0 || temp_int > 99){
-            fprintf(stdout, "VesperCSI: config error: invalid priority, valid options: 0-99");
+            fprintf(stdout, "VesperCSI: config error: invalid priority, valid options: 0-99\n");
             exit(EXIT_FAILURE);
         }
         vespercsi_config.runners.capture.priority_set = true;
@@ -52,7 +52,7 @@ void vespercsi_config_init(vespercsi_config_t* config){
 
     if(config_lookup_int(&cfg, "runners.consume.priority", &temp_int)){
         if(temp_int < 0 || temp_int > 99){
-            fprintf(stdout, "VesperCSI: config error: invalid priority, valid options: 0-99");
+            fprintf(stdout, "VesperCSI: config error: invalid priority, valid options: 0-99\n");
             exit(EXIT_FAILURE);
         }
         vespercsi_config.runners.consume.priority_set = true;

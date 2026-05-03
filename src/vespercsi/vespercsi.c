@@ -13,9 +13,11 @@ int main(int argc, char* argv[]){
     vespercsi_banner();
 
     //==========================================================//
-    //==================== Option Parse =======================//
+    //================ Option & Config Parse ===================//
 
     vespercsi_options_parse(argc, argv);
+
+    vespercsi_config_init(&vespercsi_config);
 
     vespercsi_options_check_mandatory();
 
@@ -34,7 +36,6 @@ int main(int argc, char* argv[]){
 
     vespercsi_signal_init();
 
-    vespercsi_config_init(&vespercsi_config);
 
     vespercsi_wifi_controller_init(&vespercsi_wifi_controller);
 

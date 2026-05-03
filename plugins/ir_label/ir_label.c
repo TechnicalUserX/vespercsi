@@ -79,7 +79,7 @@ const char* generate_new_record_file_name(void){
 
     if(state.out.include.action){
         strlcat(buffer, "_", PATH_MAX);
-        strlcat(buffer, action_to_string(state.action.effective), PATH_MAX);
+        strlcat(buffer, action_to_string(state.action.current), PATH_MAX);
     }
 
     if(state.out.include.index){
@@ -330,10 +330,6 @@ void* capture_periodic_runner(void* arg){
         counter_enabled = true;
     }
 
-    if(state.action.policies[state.action.current].action_hold){
-        buzzer_sequence_hold();
-    }
-
     while(!counter_enabled || counter > 0){
         // 1 period
 
@@ -389,6 +385,10 @@ void* capture_periodic_runner(void* arg){
 void start_capture_continuous(void){
     LOG(INFO, "ir_label: Starting continuous capture...");
     
+    if(state.action.policies[state.action.current].action_hold){
+        buzzer_sequence_hold();
+    }
+
     red_led_capture_start();
     buzzer_sequence_capture_start();
 
@@ -399,6 +399,13 @@ void start_capture_continuous(void){
 
 void stop_capture_continuous(void){
     LOG(INFO, "ir_label: Stopping continuous capture...");
+
+    if(state.action.current == ACTION_SITSTAND){
+        return;
+    }
+    if(state.action.policies[state.action.current].action_hold){
+        buzzer_sequence_hold();
+    }
 
     red_led_capture_stop();
     buzzer_sequence_capture_stop();
@@ -411,10 +418,19 @@ void stop_capture_continuous(void){
 void start_capture_periodic(void){
     LOG(INFO, "ir_label: Starting periodic capture...");
 
+    if(state.action.policies[state.action.current].action_hold){
+        buzzer_sequence_hold();
+    }
+
     red_led_capture_start();
     buzzer_sequence_capture_start();
 
-    state.action.index[state.action.effective] = 0;
+    if(state.action.current == ACTION_SITSTAND){
+        state.action.index[ACTION_STANDUP] = 0;
+        state.action.index[ACTION_SITDOWN] = 0;
+    }else{
+        state.action.index[state.action.effective] = 0;
+    }
     state.capture.is_recording = true;
 
     if(pthread_create(&state.capture_periodic_runner_thread, NULL, capture_periodic_runner, NULL) != 0){
@@ -995,8 +1011,8 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
 
         label_t current_label = 0;
 
-        ir_label_header.label = action_to_label(state.action.effective);
-        ir_label_header.index =  state.action.index[state.action.effective];
+        ir_label_header.action_label = action_to_label(state.action.effective);
+        ir_label_header.action_index =  state.action.index[state.action.effective];
 
         if(state.out.fd >= 0){
 
@@ -1008,7 +1024,6 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
             iov[1].iov_len  = VESPERCSI_CSI_HEADER_LENGTH;
             iov[2].iov_base = (void*)&csi->data.csi_data;
             iov[2].iov_len  = csi->header.csi_data_size;
-
 
             size_t total_to_write = iov[0].iov_len + iov[1].iov_len + iov[2].iov_len;
             size_t remaining = total_to_write;
@@ -1047,7 +1062,7 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
                             bytes_accounted_for -= iov[current_iov_index].iov_len;
                             current_iov_index++;  // Move to the next vector
                             current_iov_count--;  // We have one less vector to process
-                        } else {
+                        }else{
                             // This vector was only partially written. 
                             // Adjust its base pointer and length for the next writev call.
                             iov[current_iov_index].iov_base = (uint8_t*)iov[current_iov_index].iov_base + bytes_accounted_for;
