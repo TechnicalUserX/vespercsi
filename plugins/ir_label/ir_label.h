@@ -202,7 +202,7 @@ typedef struct action_policy_t{
 }action_policy_t;
 
 typedef struct ir_label_header_t{
-    uint16_t action_index;
+    uint16_t action_group_index;
     uint16_t action_label;
 }ir_label_header_t;
 

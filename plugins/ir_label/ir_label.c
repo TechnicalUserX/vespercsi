@@ -354,7 +354,7 @@ void* capture_periodic_runner(void* arg){
                 break;
             }            
             current_time = wallclock_us();
-            SLEEP_MILISECONDS(10);
+            SLEEP_MILISECONDS(1);
         }while(current_time - start_time < action_duration);
 
 
@@ -370,7 +370,7 @@ void* capture_periodic_runner(void* arg){
                 break;
             }
             current_time = wallclock_us();
-            SLEEP_MILISECONDS(10);
+            SLEEP_MILISECONDS(1);
         }while(current_time - start_time < action_wait);        
 
         state.action.index[state.action.effective]++;
@@ -421,9 +421,6 @@ void start_capture_periodic(void){
     if(state.action.policies[state.action.current].action_hold){
         buzzer_sequence_hold();
     }
-
-    red_led_capture_start();
-    buzzer_sequence_capture_start();
 
     if(state.action.current == ACTION_SITSTAND){
         state.action.index[ACTION_STANDUP] = 0;
@@ -1001,6 +998,7 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
         // Critical Area //
 
         int lock_attempt = pthread_mutex_trylock(&state.out.fd_lock);
+        
         if(lock_attempt == EBUSY){
             return VESPERCSI_OK;
         }else if(lock_attempt == EINVAL){
@@ -1012,7 +1010,7 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
         label_t current_label = 0;
 
         ir_label_header.action_label = action_to_label(state.action.effective);
-        ir_label_header.action_index =  state.action.index[state.action.effective];
+        ir_label_header.action_group_index =  state.action.index[state.action.effective];
 
         if(state.out.fd >= 0){
 

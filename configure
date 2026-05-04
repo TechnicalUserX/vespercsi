@@ -19,7 +19,7 @@ PROJECT_BRIEF="A Derivative Work of FeitCSI for Embedded Linux"
 TARGETS=""
 
 # Available Targets (MODIFY HERE)
-TARGETS_AVAILABLE="vespercsi print-details udp-send packet-checker ir-label"
+TARGETS_AVAILABLE="vespercsi vespercsi-viewer print-details udp-send packet-checker ir-label"
 
 ########################################
 # Default Source Extensions (MODIFY HERE)
@@ -829,9 +829,17 @@ for target in ${TARGETS}; do
             fi
 
             if config_sources "$target" "src"; then
-                config_log PASS "${PROJECT} Executable sources"
+                config_log PASS "vespercsi: Executable sources"
             else
-                config_log FAIL "${PROJECT} Executable sources"
+                config_log FAIL "vespercsi: Executable sources"
+            fi
+        ;;
+
+        vespercsi-viewer)
+            if config_sources "$target" "tools/vespercsi_viewer"; then
+                config_log PASS "vespercsi_viewer: Executable sources"
+            else
+                config_log FAIL "vespercsi_viewer: Executable sources"
             fi
         ;;
 
