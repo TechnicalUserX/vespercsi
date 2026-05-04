@@ -87,10 +87,11 @@ typedef struct {
     char target_file[1024];
     GtkWidget *main_list_container; 
     GtkWidget *status_label;
+    GtkWidget *header_toggle_btn; // Toggle button reference
     struct GroupContext *group_contexts; 
 } AppState;
 
-AppState app_state = {NULL, NULL, false, 0, "", NULL, NULL, NULL};
+AppState app_state = {NULL, NULL, false, 0, "", NULL, NULL, NULL, NULL};
 
 typedef struct GroupContext {
     uint16_t action_index;
@@ -107,11 +108,11 @@ typedef struct GroupContext {
 } GroupContext;
 
 
-// --- Core Logic ---
+// --- UI Styling & Label Helpers ---
 
 const char* get_action_name(uint16_t label) {
     switch(label) {
-        case 0: return "UNKNOWN";
+        case 0: return "NOLABEL";
         case 1: return "WALK";
         case 2: return "RUN";
         case 3: return "JUMP";
@@ -123,6 +124,47 @@ const char* get_action_name(uint16_t label) {
         default: return "INVALID_LABEL";
     }
 }
+
+const char* get_action_css_class(uint16_t label) {
+    switch(label) {
+        case 0: return "action-box-nolabel";
+        case 1: return "action-box-walk";
+        case 2: return "action-box-run"; 
+        case 3: return "action-box-jump";
+        case 4: return "action-box-still";
+        case 5: return "action-box-standup";
+        case 6: return "action-box-sitdown";
+        case 8: return "action-box-fall";
+        default: return "action-box-nolabel";
+    }
+}
+
+static void load_css() {
+    GtkCssProvider *provider = gtk_css_provider_new();
+    const char *css =
+        /* Container styling to round the outer corners of the joined boxes */
+        ".group-header { border-radius: 6px; overflow: hidden; margin-top: 2px; margin-bottom: 2px; }"
+        /* Left Side: Dark Gray Background */
+        ".group-id-box { background-color: #333333; color: #FFFFFF; padding: 8px 15px; }"
+        /* Right Side: Action Color Codings */
+        ".action-box-nolabel { background-color: #FFFFFF; color: #000000; padding: 8px 15px; }"
+        ".action-box-walk    { background-color: #FFA500; color: #000000; padding: 8px 15px; }"
+        ".action-box-run     { background-color: #00FFFF; color: #000000; padding: 8px 15px; }"
+        ".action-box-jump    { background-color: #FF4444; color: #FFFFFF; padding: 8px 15px; }"
+        ".action-box-still   { background-color: #FFFF00; color: #000000; padding: 8px 15px; }"
+        ".action-box-standup { background-color: #FFC0CB; color: #000000; padding: 8px 15px; }"
+        ".action-box-sitdown { background-color: #FF00FF; color: #FFFFFF; padding: 8px 15px; }"
+        ".action-box-fall    { background-color: #00C851; color: #FFFFFF; padding: 8px 15px; }";
+        
+    gtk_css_provider_load_from_string(provider, css);
+    gtk_style_context_add_provider_for_display(gdk_display_get_default(), 
+                                               GTK_STYLE_PROVIDER(provider), 
+                                               GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref(provider);
+}
+
+
+// --- Core Logic ---
 
 void format_timestamp(uint64_t ts, char *buf, size_t max_len) {
     time_t seconds = (time_t)(ts / 1000000ULL);
@@ -222,6 +264,11 @@ void load_csi_file(const char *filepath) {
         return;
     }
 
+    // Disable the toggle button once a file is opened
+    if (app_state.header_toggle_btn) {
+        gtk_widget_set_sensitive(app_state.header_toggle_btn, FALSE);
+    }
+
     uint8_t label_buf[4];
     int index = 1;
 
@@ -287,6 +334,10 @@ void save_csi_file(const char *filepath) {
 }
 
 // --- UI Callbacks ---
+
+static void on_header_toggle_changed(GtkToggleButton *button, gpointer user_data) {
+    app_state.use_labeled_header = gtk_toggle_button_get_active(button);
+}
 
 static void on_inspect_clicked(GtkButton *button, gpointer user_data) {
     csi_record_t *rec = (csi_record_t *)user_data;
@@ -429,10 +480,8 @@ void populate_ui() {
     csi_record_t *curr = app_state.head;
     
     // Phase 1: Contiguous Grouping Data
-    // Prevents disjoint records with identical primary keys (like 0, 0) from merging globally.
     while (curr) {
         if (curr->has_label) {
-            // 1. Find the tail (most recently added group)
             GroupContext *tail_gc = app_state.group_contexts;
             if (tail_gc != NULL) {
                 while (tail_gc->next != NULL) {
@@ -442,14 +491,12 @@ void populate_ui() {
 
             GroupContext *gc = NULL;
             
-            // 2. Only group if the primary key strictly matches the CONTIGUOUS active group
             if (tail_gc != NULL && 
                 tail_gc->action_index == curr->label.action_index && 
                 tail_gc->action_label == curr->label.action_label) {
                 gc = tail_gc;
             }
 
-            // 3. If it doesn't match the immediate previous group, start a new one
             if (gc == NULL) {
                 gc = calloc(1, sizeof(GroupContext));
                 gc->action_index = curr->label.action_index;
@@ -462,11 +509,10 @@ void populate_ui() {
                 if (app_state.group_contexts == NULL) {
                     app_state.group_contexts = gc;
                 } else {
-                    tail_gc->next = gc; // Append directly to the end
+                    tail_gc->next = gc; 
                 }
             }
 
-            // 4. Append record
             if (gc->count >= gc->capacity) {
                 gc->capacity *= 2;
                 gc->records = realloc(gc->records, gc->capacity * sizeof(GroupRecord));
@@ -494,10 +540,8 @@ void populate_ui() {
             temp_gc = temp_gc->next;
         }
 
-        // Sort by the first CSI record's timestamp in each group
         qsort(gc_array, num_groups, sizeof(GroupContext *), compare_groups_chronologically);
 
-        // Reconstruct the linked list strictly in time order
         app_state.group_contexts = gc_array[0];
         for (int i = 0; i < num_groups - 1; i++) {
             gc_array[i]->next = gc_array[i + 1];
@@ -619,18 +663,32 @@ void populate_ui() {
         gtk_box_append(GTK_BOX(inner_vbox), list_box);
         gtk_box_append(GTK_BOX(app_state.main_list_container), gc->expander);
 
-        char title[256];
-        if (gc->action_label == 0) {
-            snprintf(title, sizeof(title), "<b>Wait/Transition Period: %d | Action: UNKNOWN (0)</b>  <i>(%d records)</i>", 
-                     gc->action_index, gc->count);
-        } else {
-            snprintf(title, sizeof(title), "<b>Group: %d | Action: %s (%d)</b>  <i>(%d records)</i>", 
-                     gc->action_index, get_action_name(gc->action_label), gc->action_label, gc->count);
-        }
-        
-        GtkWidget *exp_label = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(exp_label), title);
-        gtk_expander_set_label_widget(GTK_EXPANDER(gc->expander), exp_label);
+        // --- NEW CSS RECTANGULAR HEADER LOGIC ---
+        char left_text[128];
+        snprintf(left_text, sizeof(left_text), "<b>Group %d</b>", gc->action_index);
+
+        char right_text[256];
+        snprintf(right_text, sizeof(right_text), "<b>Action: %s (%d)</b>  <i>(%d records)</i>", 
+                 get_action_name(gc->action_label), gc->action_label, gc->count);
+
+        GtkWidget *header_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+        gtk_widget_set_hexpand(header_box, TRUE);
+        gtk_widget_add_css_class(header_box, "group-header");
+
+        GtkWidget *lbl_left = gtk_label_new(NULL);
+        gtk_label_set_markup(GTK_LABEL(lbl_left), left_text);
+        gtk_widget_add_css_class(lbl_left, "group-id-box");
+        gtk_box_append(GTK_BOX(header_box), lbl_left);
+
+        GtkWidget *lbl_right = gtk_label_new(NULL);
+        gtk_label_set_markup(GTK_LABEL(lbl_right), right_text);
+        gtk_widget_add_css_class(lbl_right, get_action_css_class(gc->action_label));
+        gtk_label_set_xalign(GTK_LABEL(lbl_right), 0.0);  
+        gtk_widget_set_hexpand(lbl_right, TRUE);          
+        gtk_box_append(GTK_BOX(header_box), lbl_right);
+
+        gtk_expander_set_label_widget(GTK_EXPANDER(gc->expander), header_box);
+        // ----------------------------------------
 
         gc = gc->next;
     }
@@ -738,6 +796,8 @@ static void on_action_save_as(GSimpleAction *action, GVariant *parameter, gpoint
 
 // --- GTK4 Application Activation ---
 static void on_activate(GtkApplication *app, gpointer user_data) {
+    load_css();
+
     GtkWidget *window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), "VesperCSI Viewer");
     gtk_window_set_default_size(GTK_WINDOW(window), 1000, 700); 
@@ -771,10 +831,17 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_set_margin_top(header_bar, 10);
     gtk_widget_set_margin_bottom(header_bar, 10);    
     
-    GtkWidget *btn_save = gtk_button_new_with_label("Commit Changes (Save As...)");
+    GtkWidget *btn_save = gtk_button_new_with_label("Commit Changes");
     gtk_widget_add_css_class(btn_save, "suggested-action"); 
     g_signal_connect(btn_save, "clicked", G_CALLBACK(on_action_save_as), window);
     gtk_box_append(GTK_BOX(header_bar), btn_save);
+
+    // --- NEW: Header Toggle Button ---
+    app_state.header_toggle_btn = gtk_toggle_button_new_with_label("Expect Labeled Header");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app_state.header_toggle_btn), app_state.use_labeled_header);
+    g_signal_connect(app_state.header_toggle_btn, "toggled", G_CALLBACK(on_header_toggle_changed), NULL);
+    gtk_box_append(GTK_BOX(header_bar), app_state.header_toggle_btn);
+    // ---------------------------------
     
     app_state.status_label = gtk_label_new("Ready");
     gtk_widget_set_hexpand(app_state.status_label, TRUE);

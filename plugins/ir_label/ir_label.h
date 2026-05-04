@@ -176,12 +176,17 @@
 
 */
 
+#define    ASYNC_BUZZER_CODE_CAPTURE_START 1
+#define    ASYNC_BUZZER_CODE_CAPTURE_STOP 2
+#define    ASYNC_BUZZER_CODE_CAPTURE_WAIT 3
+#define    ASYNC_BUZZER_CODE_ACTION_CHANGE 4
+
 typedef uint16_t label_t;
 
 typedef uint8_t command_t;
 
 typedef enum action_t{
-    ACTION_UNKNOWN = 0,
+    ACTION_NOLABEL = 0,
     ACTION_WALK,
     ACTION_RUN,
     ACTION_JUMP,
@@ -191,6 +196,8 @@ typedef enum action_t{
     ACTION_SITSTAND,
     ACTION_FALL,
 }action_t;
+
+extern int async_buzzer_pipe[2];
 
 typedef struct action_policy_t{
     bool is_periodic; // If not periodic, then it is continuous
@@ -246,6 +253,10 @@ typedef struct ir_label_state_t{
     sig_atomic_t shutdown_signal;
 
     struct{
+        sig_atomic_t stop_signal;
+    }async_buzzer;
+
+    struct{
         int fd;
     }lirc;
 
@@ -268,6 +279,7 @@ typedef struct ir_label_state_t{
 
     pthread_t infrared_runner_thread;
     pthread_t capture_periodic_runner_thread;
+    pthread_t async_buzzer_runner_thread;
 
 }ir_label_state_t;
 

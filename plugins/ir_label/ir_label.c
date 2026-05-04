@@ -6,6 +6,8 @@ vespercsi_plugin_context_t vespercsi_plugin_context = {0};
 
 ir_label_state_t state = {0};
 
+int async_buzzer_pipe[2] = {0};
+
 int state_init(void){
     state.action.current = ACTION_WALK;
     state.action.effective = ACTION_WALK;
@@ -17,7 +19,13 @@ int state_init(void){
 
     state.capture_periodic_runner_thread = -1;
     state.capture.is_labeling = false;
+
+    state.async_buzzer_runner_thread = -1;
     
+    if(pipe(async_buzzer_pipe) != 0){
+        return VESPERCSI_FAIL;
+    }
+
     if(pthread_mutex_init(&state.out.fd_lock, NULL) != 0){
         return VESPERCSI_FAIL;
     }
@@ -42,7 +50,7 @@ const char* action_to_string(action_t action){
         case ACTION_SITSTAND:   return "SITSTAND";
         case ACTION_FALL:       return "FALL";
         default:
-        case ACTION_UNKNOWN:    return "UNKNOWN";
+        case ACTION_NOLABEL:    return "UNKNOWN";
     }
 }
 
@@ -226,6 +234,7 @@ static inline void buzzer_sequence_capture_wait(void){
     SLEEP_MILISECONDS(50);
 }
 
+// Synchronous
 static inline void buzzer_sequence_action_change(void){
     set_pin(GPIO_LINE_BUZZER, 1);
     SLEEP_MILISECONDS(50);
@@ -238,6 +247,7 @@ static inline void buzzer_sequence_action_change(void){
 
 }
 
+// Synchronous
 static inline void buzzer_sequence_hold(void){
     set_pin(GPIO_LINE_BUZZER, 1);
     SLEEP_MILISECONDS(500);
@@ -273,7 +283,7 @@ label_t action_to_label(action_t action){
         case ACTION_SITDOWN:    return 6;
         case ACTION_SITSTAND:   return 7;
         case ACTION_FALL:       return 8;
-        case ACTION_UNKNOWN:    return 0;
+        case ACTION_NOLABEL:    return 0;
     }
 }
 
@@ -288,7 +298,7 @@ action_t command_to_action(command_t cmd){
         case COMMAND_SET_ACTION_SITDOWN:    return ACTION_SITDOWN;
         case COMMAND_SET_ACTION_SITSTAND:   return ACTION_SITSTAND;
         case COMMAND_SET_ACTION_FALL:       return ACTION_FALL;
-        default:                            return ACTION_UNKNOWN;
+        default:                            return ACTION_NOLABEL;
     }
 }
 
@@ -300,6 +310,69 @@ void action_sitstand_swap(void){
             state.action.effective = ACTION_STANDUP;
         }
     }
+}
+
+int async_buzzer_enqueue(uint8_t buzzer_code){
+    if(buzzer_code > 4){
+        return VESPERCSI_FAIL;
+    }
+
+    int w = write(async_buzzer_pipe[1], &buzzer_code, 1);
+    if(w == 1){
+        return VESPERCSI_OK;    
+    }else{
+        return VESPERCSI_FAIL;
+    }
+}
+
+void* async_buzzer_runner(void* arg){
+
+    if(arg == NULL){
+        pthread_exit(NULL);
+    }
+
+    struct pollfd pfd = {.fd = async_buzzer_pipe[0], .events = POLLIN};
+
+    while(1){
+
+        if(state.async_buzzer.stop_signal){
+            pthread_exit(NULL);
+        }
+
+        int r = poll(&pfd, 1, 200);
+
+        if(r == 0){
+            // Timeout
+            continue;
+        }else if(pfd.revents & POLLIN){
+            uint8_t byte = 0;
+            ssize_t r = read(async_buzzer_pipe[0], &byte, 1);
+            if(r != 1){
+                continue;
+            }
+            switch(byte){
+                case ASYNC_BUZZER_CODE_CAPTURE_START:{
+                    buzzer_sequence_capture_start();
+                }break;
+
+                case ASYNC_BUZZER_CODE_CAPTURE_STOP:{
+                    buzzer_sequence_capture_stop();
+                }break;
+
+                case ASYNC_BUZZER_CODE_CAPTURE_WAIT:{
+                    buzzer_sequence_capture_wait();
+                }break;
+
+                case ASYNC_BUZZER_CODE_ACTION_CHANGE:{
+                    buzzer_sequence_action_change();
+                }break;
+
+            }
+        }
+
+
+    }
+
 }
 
 void* capture_periodic_runner(void* arg){
@@ -345,9 +418,13 @@ void* capture_periodic_runner(void* arg){
         action_sitstand_swap();
 
         red_led_capture_start();
-        buzzer_sequence_capture_start();
+        async_buzzer_enqueue(ASYNC_BUZZER_CODE_CAPTURE_START);
 
         state.capture.is_labeling = true;
+
+        if(!state.capture.enable){
+            state.capture.enable = true;
+        }
         
         start_time = wallclock_us();
         do{
@@ -358,12 +435,12 @@ void* capture_periodic_runner(void* arg){
             current_time = wallclock_us();
         }while(current_time - start_time < action_duration);
 
-        state.action.index[ACTION_UNKNOWN]++;
+        state.action.index[ACTION_NOLABEL]++;
         
         state.capture.is_labeling = false;
 
         red_led_capture_stop();
-        buzzer_sequence_capture_wait();
+        async_buzzer_enqueue(ASYNC_BUZZER_CODE_CAPTURE_WAIT);
 
         start_time = wallclock_us();
         do{
@@ -391,7 +468,8 @@ void start_capture_continuous(void){
     }
 
     red_led_capture_start();
-    buzzer_sequence_capture_start();
+    async_buzzer_enqueue(ASYNC_BUZZER_CODE_CAPTURE_START);
+
 
     state.action.index[state.action.effective] = 0;
     state.capture.is_recording = true;
@@ -413,7 +491,8 @@ void stop_capture_continuous(void){
     }
 
     red_led_capture_stop();
-    buzzer_sequence_capture_stop();
+    async_buzzer_enqueue(ASYNC_BUZZER_CODE_CAPTURE_STOP);
+
 
     state.capture.is_recording = false;
     state.action.index[state.action.effective] = 0;
@@ -432,16 +511,14 @@ void start_capture_periodic(void){
     }else{
         state.action.index[state.action.effective] = 0;
     }
-    state.action.index[ACTION_UNKNOWN] = 0;
+    state.action.index[ACTION_NOLABEL] = 0;
 
-    state.capture.is_labeling = true;
     state.capture.is_recording = true;
 
     if(pthread_create(&state.capture_periodic_runner_thread, NULL, capture_periodic_runner, NULL) != 0){
         LOG(FAIL, "ir_label: Cannot create capture_periodic_runner thread");
         return;
     }         
-    state.capture.enable = true;
 }
 
 void stop_capture_periodic(bool self){
@@ -453,7 +530,7 @@ void stop_capture_periodic(bool self){
     state.capture.is_recording = false;
 
     red_led_capture_stop();
-    buzzer_sequence_capture_stop();
+    async_buzzer_enqueue(ASYNC_BUZZER_CODE_CAPTURE_STOP);
 
     if(self){
         close_out(false);
@@ -531,7 +608,8 @@ void command_interpreter(command_t cmd){
                          state.action.effective = state.action.current;
                     }
 
-                    buzzer_sequence_action_change();
+                        async_buzzer_enqueue(ASYNC_BUZZER_CODE_ACTION_CHANGE);
+
                 }
 
             }
@@ -1021,8 +1099,8 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
             ir_label_header.action_label = action_to_label(state.action.effective);
             ir_label_header.action_group_index =  state.action.index[state.action.effective];
         }else{
-            ir_label_header.action_label = ACTION_UNKNOWN;
-            ir_label_header.action_group_index =  state.action.index[ACTION_UNKNOWN];
+            ir_label_header.action_label = ACTION_NOLABEL;
+            ir_label_header.action_group_index =  state.action.index[ACTION_NOLABEL];
         }
 
 
@@ -1094,7 +1172,7 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
         }
 
         pthread_mutex_unlock(&state.out.fd_lock);
-    // Capture Enabled
+        // Capture Enabled
     }
 
     return VESPERCSI_OK;
@@ -1104,16 +1182,25 @@ int vespercsi_plugin_function_destroy(void){
 
     LOG_VERBOSE(VERBOSITY_1, INFO, "ir_label: Stopping infrared_runner thread");
 
+    if(state.async_buzzer_runner_thread != -1){
+        state.async_buzzer.stop_signal = true;
+        pthread_join(state.async_buzzer_runner_thread, NULL);
+    }
+
     if(state.capture_periodic_runner_thread != -1){
         state.capture.stop_periodic_signal = true;
         pthread_join(state.capture_periodic_runner_thread, NULL);
     }
+
 
     if(state.infrared_runner_thread != -1){
         state.shutdown_signal = true;
         pthread_join(state.infrared_runner_thread, NULL);
     }
     
+    close(async_buzzer_pipe[0]);
+    close(async_buzzer_pipe[1]);
+
     pthread_mutex_destroy(&state.out.fd_lock);
     free_resources();
     LOG(INFO, "ir_label: Plugin destroyed");
