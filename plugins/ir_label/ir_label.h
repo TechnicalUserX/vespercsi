@@ -236,6 +236,7 @@ typedef struct ir_label_state_t{
 
     struct{
         atomic_bool is_recording;
+        atomic_bool is_labeling;
         atomic_bool enable;
         sig_atomic_t stop_periodic_signal;
         uint64_t index;

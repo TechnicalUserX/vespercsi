@@ -16,7 +16,8 @@ int state_init(void){
     state.infrared_runner_thread = -1;
 
     state.capture_periodic_runner_thread = -1;
-
+    state.capture.is_labeling = false;
+    
     if(pthread_mutex_init(&state.out.fd_lock, NULL) != 0){
         return VESPERCSI_FAIL;
     }
@@ -166,6 +167,7 @@ int close_out(bool discard){
                 state.capture.index++;
             }
         }
+
         strlcpy(state.out.fd_path, "", PATH_MAX);
         state.out.fd = -1;
     }
@@ -347,7 +349,7 @@ void* capture_periodic_runner(void* arg){
 
         action_sitstand_swap();
 
-        state.capture.enable = true;
+        state.capture.is_labeling = true;
 
         do{
             if(state.capture.stop_periodic_signal){
@@ -358,7 +360,7 @@ void* capture_periodic_runner(void* arg){
         }while(current_time - start_time < action_duration);
 
 
-        state.capture.enable = false;
+        state.capture.is_labeling = false;
 
         red_led_capture_stop();
         buzzer_sequence_capture_wait();
@@ -374,6 +376,7 @@ void* capture_periodic_runner(void* arg){
         }while(current_time - start_time < action_wait);        
 
         state.action.index[state.action.effective]++;
+        state.action.index[ACTION_UNKNOWN]++;
         counter--;
     }
 
@@ -395,10 +398,14 @@ void start_capture_continuous(void){
     state.action.index[state.action.effective] = 0;
     state.capture.is_recording = true;
     state.capture.enable = true;
+    state.capture.is_labeling = true;
 }
 
 void stop_capture_continuous(void){
     LOG(INFO, "ir_label: Stopping continuous capture...");
+
+    state.capture.enable = false;
+    state.capture.is_labeling = false;
 
     if(state.action.current == ACTION_SITSTAND){
         return;
@@ -411,7 +418,6 @@ void stop_capture_continuous(void){
     buzzer_sequence_capture_stop();
 
     state.capture.is_recording = false;
-    state.capture.enable = false;
     state.action.index[state.action.effective] = 0;
 }
 
@@ -428,16 +434,21 @@ void start_capture_periodic(void){
     }else{
         state.action.index[state.action.effective] = 0;
     }
+    state.action.index[ACTION_UNKNOWN] = 0;
+
     state.capture.is_recording = true;
 
     if(pthread_create(&state.capture_periodic_runner_thread, NULL, capture_periodic_runner, NULL) != 0){
         LOG(FAIL, "ir_label: Cannot create capture_periodic_runner thread");
         return;
     }         
+    state.capture.enable = true;
 }
 
 void stop_capture_periodic(bool self){
     LOG(INFO, "ir_label: Stopping periodic capture...");
+
+    state.capture.enable = false;
 
     state.action.index[state.action.effective] = 0;
     state.capture.is_recording = false;
@@ -1006,11 +1017,16 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
         }
 
         ir_label_header_t ir_label_header = {0};
-
         label_t current_label = 0;
 
-        ir_label_header.action_label = action_to_label(state.action.effective);
-        ir_label_header.action_group_index =  state.action.index[state.action.effective];
+        if(state.capture.is_labeling){
+            ir_label_header.action_label = action_to_label(state.action.effective);
+            ir_label_header.action_group_index =  state.action.index[state.action.effective];
+        }else{
+            ir_label_header.action_label = ACTION_UNKNOWN;
+            ir_label_header.action_group_index =  state.action.index[ACTION_UNKNOWN];
+        }
+
 
         if(state.out.fd >= 0){
 
