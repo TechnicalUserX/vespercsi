@@ -327,10 +327,6 @@ int async_buzzer_enqueue(uint8_t buzzer_code){
 
 void* async_buzzer_runner(void* arg){
 
-    if(arg == NULL){
-        pthread_exit(NULL);
-    }
-
     struct pollfd pfd = {.fd = async_buzzer_pipe[0], .events = POLLIN};
 
     while(1){
