@@ -336,53 +336,51 @@ void* capture_periodic_runner(void* arg){
         // 1 period
 
         if(state.capture.stop_periodic_signal){
-            pthread_exit(NULL);
+            break;
         }
 
         uint64_t start_time = 0;
         uint64_t current_time = 0;
 
-        start_time = wallclock_us();
+        action_sitstand_swap();
 
         red_led_capture_start();
         buzzer_sequence_capture_start();
 
-        action_sitstand_swap();
-
         state.capture.is_labeling = true;
-
+        
+        start_time = wallclock_us();
         do{
             if(state.capture.stop_periodic_signal){
                 break;
             }            
-            current_time = wallclock_us();
             SLEEP_MILISECONDS(1);
+            current_time = wallclock_us();
         }while(current_time - start_time < action_duration);
 
-
+        state.action.index[ACTION_UNKNOWN]++;
+        
         state.capture.is_labeling = false;
 
         red_led_capture_stop();
         buzzer_sequence_capture_wait();
 
         start_time = wallclock_us();
-
         do{
             if(state.capture.stop_periodic_signal){
                 break;
             }
-            current_time = wallclock_us();
             SLEEP_MILISECONDS(1);
+            current_time = wallclock_us();
         }while(current_time - start_time < action_wait);        
 
         state.action.index[state.action.effective]++;
-        state.action.index[ACTION_UNKNOWN]++;
         counter--;
     }
 
     stop_capture_periodic(true);
 
-    return NULL;
+    pthread_exit(NULL);
 }
 
 void start_capture_continuous(void){
@@ -397,8 +395,8 @@ void start_capture_continuous(void){
 
     state.action.index[state.action.effective] = 0;
     state.capture.is_recording = true;
-    state.capture.enable = true;
     state.capture.is_labeling = true;
+    state.capture.enable = true;
 }
 
 void stop_capture_continuous(void){
@@ -436,6 +434,7 @@ void start_capture_periodic(void){
     }
     state.action.index[ACTION_UNKNOWN] = 0;
 
+    state.capture.is_labeling = true;
     state.capture.is_recording = true;
 
     if(pthread_create(&state.capture_periodic_runner_thread, NULL, capture_periodic_runner, NULL) != 0){
@@ -547,7 +546,7 @@ void command_interpreter(command_t cmd){
         case COMMAND_CAPTURE_INDEX_DECREASE:{
             if(state.capture.index > 0){
                 state.capture.index--;
-                LOG(INFO, "ir_label: Capture index increased to %" PRIu64, state.capture.index);
+                LOG(INFO, "ir_label: Capture index decreased to %" PRIu64, state.capture.index);
             }
         }break;
 
@@ -1017,7 +1016,6 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
         }
 
         ir_label_header_t ir_label_header = {0};
-        label_t current_label = 0;
 
         if(state.capture.is_labeling){
             ir_label_header.action_label = action_to_label(state.action.effective);

@@ -111,6 +111,7 @@ typedef struct GroupContext {
 
 const char* get_action_name(uint16_t label) {
     switch(label) {
+        case 0: return "UNKNOWN";
         case 1: return "WALK";
         case 2: return "RUN";
         case 3: return "JUMP";
@@ -119,7 +120,7 @@ const char* get_action_name(uint16_t label) {
         case 6: return "SITDOWN";
         case 7: return "SITSTAND";
         case 8: return "FALL";
-        default: return "UNKNOWN";
+        default: return "INVALID_LABEL";
     }
 }
 
@@ -371,7 +372,6 @@ static void on_single_delete_clicked(GtkButton *button, gpointer user_data) {
 static void on_trim_value_changed(GtkAdjustment *adjustment, gpointer user_data) {
     GroupContext *gc = (GroupContext *)user_data;
     
-    // Add 0.5 before casting to ensure flawless rounding from doubles to integers
     int start_idx = (int)(gtk_adjustment_get_value(gc->adj_start) + 0.5);
     int end_idx = (int)(gtk_adjustment_get_value(gc->adj_end) + 0.5);
 
@@ -402,33 +402,54 @@ static void on_trim_value_changed(GtkAdjustment *adjustment, gpointer user_data)
         gtk_label_set_markup(GTK_LABEL(gc->lbl_time_end), time_str);
     }
 
-    // Live auto-apply deletion based on bounds. 
-    // Data outside bounds is deleted. Data inside is restored.
     for (int i = 0; i < gc->count; i++) {
         bool is_outside_bounds = (i < start_idx || i > end_idx);
-        
-        // Only update UI if state actually flipped (prevents UI flicker when scrubbing)
         if (gc->records[i].rec->is_deleted != is_outside_bounds) {
             set_row_delete_state(&gc->records[i], is_outside_bounds);
         }
     }
 }
 
+// --- Group Chronological Comparator ---
+int compare_groups_chronologically(const void *a, const void *b) {
+    GroupContext *g1 = *(GroupContext **)a;
+    GroupContext *g2 = *(GroupContext **)b;
+    
+    if (g1->count == 0 || g2->count == 0) return 0;
+
+    uint64_t t1 = g1->records[0].rec->header.timestamp;
+    uint64_t t2 = g2->records[0].rec->header.timestamp;
+    
+    if (t1 < t2) return -1;
+    if (t1 > t2) return 1;
+    return 0;
+}
 
 void populate_ui() {
     csi_record_t *curr = app_state.head;
     
-    // Phase 1: Grouping Data
+    // Phase 1: Contiguous Grouping Data
+    // Prevents disjoint records with identical primary keys (like 0, 0) from merging globally.
     while (curr) {
         if (curr->has_label) {
-            GroupContext *gc = app_state.group_contexts;
-            while (gc != NULL) {
-                if (gc->action_index == curr->label.action_index && gc->action_label == curr->label.action_label) {
-                    break;
+            // 1. Find the tail (most recently added group)
+            GroupContext *tail_gc = app_state.group_contexts;
+            if (tail_gc != NULL) {
+                while (tail_gc->next != NULL) {
+                    tail_gc = tail_gc->next;
                 }
-                gc = gc->next;
             }
 
+            GroupContext *gc = NULL;
+            
+            // 2. Only group if the primary key strictly matches the CONTIGUOUS active group
+            if (tail_gc != NULL && 
+                tail_gc->action_index == curr->label.action_index && 
+                tail_gc->action_label == curr->label.action_label) {
+                gc = tail_gc;
+            }
+
+            // 3. If it doesn't match the immediate previous group, start a new one
             if (gc == NULL) {
                 gc = calloc(1, sizeof(GroupContext));
                 gc->action_index = curr->label.action_index;
@@ -436,11 +457,16 @@ void populate_ui() {
                 gc->capacity = 16;
                 gc->records = malloc(gc->capacity * sizeof(GroupRecord));
                 gc->count = 0;
+                gc->next = NULL;
                 
-                gc->next = app_state.group_contexts;
-                app_state.group_contexts = gc;
+                if (app_state.group_contexts == NULL) {
+                    app_state.group_contexts = gc;
+                } else {
+                    tail_gc->next = gc; // Append directly to the end
+                }
             }
 
+            // 4. Append record
             if (gc->count >= gc->capacity) {
                 gc->capacity *= 2;
                 gc->records = realloc(gc->records, gc->capacity * sizeof(GroupRecord));
@@ -450,6 +476,35 @@ void populate_ui() {
             gc->count++;
         }
         curr = curr->next;
+    }
+
+    // Phase 1.5: Ensure Strict Chronological Ordering
+    int num_groups = 0;
+    GroupContext *temp_gc = app_state.group_contexts;
+    while(temp_gc) {
+        num_groups++;
+        temp_gc = temp_gc->next;
+    }
+
+    if (num_groups > 1) {
+        GroupContext **gc_array = malloc(num_groups * sizeof(GroupContext *));
+        temp_gc = app_state.group_contexts;
+        for (int i = 0; i < num_groups; i++) {
+            gc_array[i] = temp_gc;
+            temp_gc = temp_gc->next;
+        }
+
+        // Sort by the first CSI record's timestamp in each group
+        qsort(gc_array, num_groups, sizeof(GroupContext *), compare_groups_chronologically);
+
+        // Reconstruct the linked list strictly in time order
+        app_state.group_contexts = gc_array[0];
+        for (int i = 0; i < num_groups - 1; i++) {
+            gc_array[i]->next = gc_array[i + 1];
+        }
+        gc_array[num_groups - 1]->next = NULL;
+
+        free(gc_array);
     }
 
     // Phase 2: Building UI
@@ -490,7 +545,6 @@ void populate_ui() {
             gtk_box_append(GTK_BOX(hbox_start), spin_start);
             GtkWidget *scale_start = gtk_scale_new(GTK_ORIENTATION_HORIZONTAL, gc->adj_start);
             
-            // Force GTK scale to snap precisely to integer values
             gtk_scale_set_digits(GTK_SCALE(scale_start), 0);
             gtk_range_set_round_digits(GTK_RANGE(scale_start), 0);
             
@@ -509,7 +563,6 @@ void populate_ui() {
             gtk_box_append(GTK_BOX(hbox_end), spin_end);
             GtkWidget *scale_end = gtk_scale_new(GTK_ORIENTATION_HORIZONTAL, gc->adj_end);
             
-            // Force GTK scale to snap precisely to integer values
             gtk_scale_set_digits(GTK_SCALE(scale_end), 0);
             gtk_range_set_round_digits(GTK_RANGE(scale_end), 0);
             
@@ -567,8 +620,13 @@ void populate_ui() {
         gtk_box_append(GTK_BOX(app_state.main_list_container), gc->expander);
 
         char title[256];
-        snprintf(title, sizeof(title), "<b>Group: %d | Action: %s (%d)</b>  <i>(%d records)</i>", 
-                 gc->action_index, get_action_name(gc->action_label), gc->action_label, gc->count);
+        if (gc->action_label == 0) {
+            snprintf(title, sizeof(title), "<b>Wait/Transition Period: %d | Action: UNKNOWN (0)</b>  <i>(%d records)</i>", 
+                     gc->action_index, gc->count);
+        } else {
+            snprintf(title, sizeof(title), "<b>Group: %d | Action: %s (%d)</b>  <i>(%d records)</i>", 
+                     gc->action_index, get_action_name(gc->action_label), gc->action_label, gc->count);
+        }
         
         GtkWidget *exp_label = gtk_label_new(NULL);
         gtk_label_set_markup(GTK_LABEL(exp_label), title);
@@ -614,6 +672,8 @@ void populate_ui() {
     snprintf(status_msg, sizeof(status_msg), "Loaded %d records from %s", app_state.total_records, app_state.target_file);
     gtk_label_set_text(GTK_LABEL(app_state.status_label), status_msg);
 }
+
+
 
 // --- Menu Bar / Dialog Callbacks ---
 
