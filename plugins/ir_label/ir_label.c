@@ -1076,6 +1076,15 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
         LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: Created infrared_runner thread");
     }
 
+
+    if(pthread_create(&state.async_buzzer_runner_thread, NULL, async_buzzer_runner, NULL) != 0){
+        LOG(FAIL, "ir_label: Cannot create async_buzzer_runner thread");
+        free_resources();
+        return VESPERCSI_FAIL;
+    }else{
+        LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: Created async_buzzer_runner thread");
+    }
+
     LOG(INFO, "ir_label: Plugin initalized");
     return VESPERCSI_OK;
 }
