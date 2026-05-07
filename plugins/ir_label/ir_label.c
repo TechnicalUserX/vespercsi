@@ -449,7 +449,7 @@ void* capture_periodic_runner(void* arg){
             if(state.capture.stop_periodic_signal){
                 break;
             }            
-            precise_sleep_posix(500);
+            SLEEP_MILISECONDS(1);
             current_time = wallclock_us();
         }while(current_time - start_time < action_duration);
 
@@ -465,7 +465,7 @@ void* capture_periodic_runner(void* arg){
             if(state.capture.stop_periodic_signal){
                 break;
             }
-            precise_sleep_posix(500);
+            SLEEP_MILISECONDS(1);
             current_time = wallclock_us();
         }while(current_time - start_time < action_wait); 
 
