@@ -33,6 +33,28 @@ int state_init(void){
     return VESPERCSI_OK;
 }
 
+#include <stdio.h>
+#include <time.h>
+#include <stdint.h>
+
+void precise_sleep_posix(uint64_t usec) {
+    struct timespec ts;
+    
+    // 1. Get current time
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+
+    // 2. Add the requested microseconds to the current time
+    uint64_t target_nsec = ts.tv_nsec + (usec * 1000);
+    
+    // Handle nanosecond overflow into seconds
+    ts.tv_sec += target_nsec / 1000000000;
+    ts.tv_nsec = target_nsec % 1000000000;
+
+    // 3. Sleep until that absolute time
+    // TIMER_ABSTIME ensures we wake up exactly at the target, regardless of signals
+    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, NULL);
+}
+
 static inline uint64_t wallclock_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
@@ -430,7 +452,7 @@ void* capture_periodic_runner(void* arg){
         //     SLEEP_MILISECONDS(1);
         //     current_time = wallclock_us();
         // }while(current_time - start_time < action_duration);
-        usleep(action_duration);
+        precise_sleep_posix(action_duration);
 
         state.action.index[ACTION_NOLABEL]++;
         
@@ -447,7 +469,7 @@ void* capture_periodic_runner(void* arg){
         //     SLEEP_MILISECONDS(1);
         //     current_time = wallclock_us();
         // }while(current_time - start_time < action_wait); 
-        usleep(action_wait);       
+        precise_sleep_posix(action_wait);       
 
         state.action.index[state.action.effective]++;
         counter--;
