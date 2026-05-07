@@ -444,15 +444,14 @@ void* capture_periodic_runner(void* arg){
             state.capture.enable = true;
         }
         
-        //start_time = wallclock_us();
-        // do{
-        //     if(state.capture.stop_periodic_signal){
-        //         break;
-        //     }            
-        //     SLEEP_MILISECONDS(1);
-        //     current_time = wallclock_us();
-        // }while(current_time - start_time < action_duration);
-        precise_sleep_posix(action_duration);
+        start_time = wallclock_us();
+        do{
+            if(state.capture.stop_periodic_signal){
+                break;
+            }            
+            precise_sleep_posix(500);
+            current_time = wallclock_us();
+        }while(current_time - start_time < action_duration);
 
         state.action.index[ACTION_NOLABEL]++;
         
@@ -461,15 +460,14 @@ void* capture_periodic_runner(void* arg){
         red_led_capture_stop();
         async_buzzer_enqueue(ASYNC_BUZZER_CODE_CAPTURE_WAIT);
 
-        // start_time = wallclock_us();
-        // do{
-        //     if(state.capture.stop_periodic_signal){
-        //         break;
-        //     }
-        //     SLEEP_MILISECONDS(1);
-        //     current_time = wallclock_us();
-        // }while(current_time - start_time < action_wait); 
-        precise_sleep_posix(action_wait);       
+        start_time = wallclock_us();
+        do{
+            if(state.capture.stop_periodic_signal){
+                break;
+            }
+            precise_sleep_posix(500);
+            current_time = wallclock_us();
+        }while(current_time - start_time < action_wait); 
 
         state.action.index[state.action.effective]++;
         counter--;
