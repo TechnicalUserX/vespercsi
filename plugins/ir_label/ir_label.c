@@ -435,15 +435,22 @@ void* capture_periodic_runner(void* arg){
 
         action_sitstand_swap();
 
+        if(!state.capture.enable){
+
+            if(state.action.policies[state.action.current].action_hold){
+                state.capture.enable = true;
+                buzzer_sequence_hold();
+                state.capture.is_labeling = true;
+            }else{
+                state.capture.is_labeling = true;
+                state.capture.enable = true;
+            }
+
+        }
+
         red_led_capture_start();
         async_buzzer_enqueue(ASYNC_BUZZER_CODE_CAPTURE_START);
 
-        state.capture.is_labeling = true;
-
-        if(!state.capture.enable){
-            state.capture.enable = true;
-        }
-        
         start_time = wallclock_us();
         do{
             if(state.capture.stop_periodic_signal){
@@ -519,16 +526,13 @@ void stop_capture_continuous(void){
 void start_capture_periodic(void){
     LOG(INFO, "ir_label: Starting periodic capture...");
 
-    if(state.action.policies[state.action.current].action_hold){
-        buzzer_sequence_hold();
-    }
-
     if(state.action.current == ACTION_SITSTAND){
         state.action.index[ACTION_STANDUP] = 0;
         state.action.index[ACTION_SITDOWN] = 0;
     }else{
         state.action.index[state.action.effective] = 0;
     }
+
     state.action.index[ACTION_NOLABEL] = 0;
 
     state.capture.is_recording = true;
