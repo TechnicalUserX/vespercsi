@@ -435,6 +435,7 @@ void* capture_periodic_runner(void* arg){
 
         action_sitstand_swap();
 
+        
         if(!state.capture.enable){
 
             if(state.action.policies[state.action.current].action_hold){
