@@ -435,7 +435,7 @@ void* capture_periodic_runner(void* arg){
 
         action_sitstand_swap();
 
-        
+
         if(!state.capture.enable){
 
             if(state.action.policies[state.action.current].action_hold){
@@ -447,6 +447,8 @@ void* capture_periodic_runner(void* arg){
                 state.capture.enable = true;
             }
 
+        }else{
+            state.capture.is_labeling = true;
         }
 
         red_led_capture_start();
