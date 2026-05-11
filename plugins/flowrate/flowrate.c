@@ -24,21 +24,103 @@ static struct termios orig_termios;
 static int term_cols = 80;
 static int term_rows = 24;
 
-// 5x5 ASCII Font for Digits 0-9
-static const char* digits[10][5] = {
-    {" ### ", "#   #", "#   #", "#   #", " ### "}, // 0
-    {"  #  ", " ##  ", "  #  ", "  #  ", " ### "}, // 1
-    {" ### ", "    #", " ### ", "#    ", " ### "}, // 2
-    {" ### ", "    #", " ### ", "    #", " ### "}, // 3
-    {"#   #", "#   #", " ### ", "    #", "    #"}, // 4
-    {" ### ", "#    ", " ### ", "    #", " ### "}, // 5
-    {" ### ", "#    ", " ### ", "#   #", " ### "}, // 6
-    {" ### ", "    #", "   # ", "  #  ", "  #  "}, // 7
-    {" ### ", "#   #", " ### ", "#   #", " ### "}, // 8
-    {" ### ", "#   #", " ### ", "    #", " ### "}  // 9
-};
+// 8x7 ASCII Font mimicking a 7-Segment Display
+#define DIGIT_WIDTH 8
+#define DIGIT_HEIGHT 7
+#define DIGIT_SPACING 2 
 
-vespercsi_plugin_context_t vespercsi_plugin_context;
+static const char* digits[10][DIGIT_HEIGHT] = {
+    { // 0
+        " ###### ",
+        "##    ##",
+        "##    ##",
+        "        ",
+        "##    ##",
+        "##    ##",
+        " ###### "
+    },
+    { // 1
+        "      ##",
+        "      ##",
+        "      ##",
+        "        ",
+        "      ##",
+        "      ##",
+        "      ##"
+    },
+    { // 2
+        " ###### ",
+        "      ##",
+        "      ##",
+        " ###### ",
+        "##      ",
+        "##      ",
+        " ###### "
+    },
+    { // 3
+        " ###### ",
+        "      ##",
+        "      ##",
+        " ###### ",
+        "      ##",
+        "      ##",
+        " ###### "
+    },
+    { // 4
+        "##    ##",
+        "##    ##",
+        "##    ##",
+        " ###### ",
+        "      ##",
+        "      ##",
+        "      ##"
+    },
+    { // 5
+        " ###### ",
+        "##      ",
+        "##      ",
+        " ###### ",
+        "      ##",
+        "      ##",
+        " ###### "
+    },
+    { // 6
+        " ###### ",
+        "##      ",
+        "##      ",
+        " ###### ",
+        "##    ##",
+        "##    ##",
+        " ###### "
+    },
+    { // 7
+        " ###### ",
+        "      ##",
+        "      ##",
+        "        ",
+        "      ##",
+        "      ##",
+        "      ##"
+    },
+    { // 8
+        " ###### ",
+        "##    ##",
+        "##    ##",
+        " ###### ",
+        "##    ##",
+        "##    ##",
+        " ###### "
+    },
+    { // 9
+        " ###### ",
+        "##    ##",
+        "##    ##",
+        " ###### ",
+        "      ##",
+        "      ##",
+        " ###### "
+    }
+};
 
 // Delta-rendering logic to prevent terminal flicker
 void draw_rate(int rate) {
@@ -50,22 +132,23 @@ void draw_rate(int rate) {
     int cur_len = strlen(current_str);
     int last_len = (last_rate == -1) ? 0 : strlen(last_str);
     
-    // If the number of digits changes (e.g., 1000 -> 999), 
-    // the bounding box shifts. Clear the old footprint.
+    int char_stride = DIGIT_WIDTH + DIGIT_SPACING; // 10 chars per digit footprint
+    
+    // If the number of digits changes (e.g., 1000 -> 999), clear the old footprint
     if (cur_len != last_len && last_rate != -1) {
-        int old_width = last_len * 6 - 1;
+        int old_width = last_len * char_stride - DIGIT_SPACING;
         int old_x = (term_cols - old_width) / 2;
-        int start_y = (term_rows - 5) / 2;
+        int start_y = (term_rows - DIGIT_HEIGHT) / 2;
         
-        for (int r = 0; r < 5; r++) {
+        for (int r = 0; r < DIGIT_HEIGHT; r++) {
             printf("\033[%d;%dH", start_y + r, old_x);
             for (int c = 0; c < old_width; c++) putchar(' ');
         }
     }
     
-    int total_width = cur_len * 6 - 1;
+    int total_width = cur_len * char_stride - DIGIT_SPACING;
     int start_x = (term_cols - total_width) / 2;
-    int start_y = (term_rows - 5) / 2;
+    int start_y = (term_rows - DIGIT_HEIGHT) / 2;
     
     // Set color to Cyan and bold
     printf("\033[1;36m"); 
@@ -74,15 +157,15 @@ void draw_rate(int rate) {
         // Redraw only if the string length changed OR the specific digit changed
         if (cur_len != last_len || current_str[i] != last_str[i]) {
             int digit = current_str[i] - '0';
-            for (int r = 0; r < 5; r++) {
-                printf("\033[%d;%dH%s", start_y + r, start_x + (i * 6), digits[digit][r]);
+            for (int r = 0; r < DIGIT_HEIGHT; r++) {
+                printf("\033[%d;%dH%s", start_y + r, start_x + (i * char_stride), digits[digit][r]);
             }
         }
     }
     
     // Draw "PPS" static label below the numbers
     printf("\033[0;37m"); // Reset to white
-    printf("\033[%d;%dH CSI Packets / Sec ", start_y + 6, (term_cols - 19) / 2);
+    printf("\033[%d;%dH CSI Packets / Sec ", start_y + DIGIT_HEIGHT + 2, (term_cols - 19) / 2);
     
     fflush(stdout);
     last_rate = rate;
