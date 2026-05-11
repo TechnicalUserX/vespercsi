@@ -8,6 +8,8 @@
 #include <termios.h>
 #include <sys/ioctl.h>
 
+vespercsi_plugin_context_t vespercsi_plugin_context;
+
 // Sliding window configuration
 #define NUM_BUCKETS 5 // 5 buckets of 200ms = 1 second
 static atomic_int current_bucket_count = ATOMIC_VAR_INIT(0);
