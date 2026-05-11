@@ -458,7 +458,7 @@ void* capture_periodic_runner(void* arg){
         do{
             if(state.capture.stop_periodic_signal){
                 break;
-            }            
+            }
             SLEEP_MILISECONDS(1);
             current_time = wallclock_us();
         }while(current_time - start_time < action_duration);

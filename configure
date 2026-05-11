@@ -19,7 +19,7 @@ PROJECT_BRIEF="A Derivative Work of FeitCSI for Embedded Linux"
 TARGETS=""
 
 # Available Targets (MODIFY HERE)
-TARGETS_AVAILABLE="vespercsi vespercsi-viewer print-details udp-send packet-checker ir-label"
+TARGETS_AVAILABLE="vespercsi vespercsi-viewer print-details udp-send packet-checker ir-label flowrate"
 
 ########################################
 # Default Source Extensions (MODIFY HERE)
@@ -877,6 +877,14 @@ for target in ${TARGETS}; do
                 config_log FAIL "${PROJECT} Plugin sources: ir-label"
             fi        
         ;;
+
+        flowrate)
+            if config_sources "$target" "plugins/flowrate"; then
+                config_log PASS "${PROJECT} Plugin sources: flowrate"
+            else
+                config_log FAIL "${PROJECT} Plugin sources: flowrate"
+            fi        
+        ;;        
 
     esac
     
