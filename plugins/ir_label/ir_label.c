@@ -483,8 +483,11 @@ void* capture_periodic_runner(void* arg){
         counter--;
     }
 
-    stop_capture_periodic(true);
+    if (!state.capture.stop_periodic_signal) {
+        stop_capture_periodic(true);
+    }
 
+    // If stop_periodic_signal IS true, we just exit so pthread_join() can succeed safely
     pthread_exit(NULL);
 }
 
@@ -663,10 +666,7 @@ void command_interpreter(command_t cmd){
             }
         }break;
 
-        default:{
-            buzzer_sequence_input();
-        }break;
-        
+        default: break;
     }
 
     state.command.previous = state.command.current;
@@ -700,6 +700,14 @@ void* infrared_runner(void* arg){
             }
 
             // Good read, make something based on it
+
+            // Do not allow repeated presses
+            if(sc.flags & LIRC_SCANCODE_FLAG_REPEAT){
+                // Discard REPEAT press
+                LOG_VERBOSE(VERBOSITY_2, DEBG, "ir_label: Discarded command due to repeated press");
+                continue;
+            }
+
             command_t cmd = sc.scancode & 0xFF;
 
             LOG_VERBOSE(VERBOSITY_1, DEBG, "ir_label: Received command: 0x%02X", cmd);
