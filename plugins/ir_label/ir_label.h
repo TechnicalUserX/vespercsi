@@ -205,7 +205,9 @@ typedef struct action_policy_t{
     uint64_t action_duration; // Action duration, valid time interval for recording
     uint64_t action_wait; // Time to wait between each recordings
     uint64_t action_count; // If zero, it means no bound
-    uint64_t action_hold; // Amount of time to wait before beginning 
+    bool action_hold; // Amount of time to wait before beginning 
+    bool action_hold_nolabel;
+    uint64_t action_hold_seconds;
 }action_policy_t;
 
 typedef struct ir_label_header_t{

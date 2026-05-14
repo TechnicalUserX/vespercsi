@@ -269,21 +269,12 @@ static inline void buzzer_sequence_action_change(void){
 
 }
 
-// Synchronous
-static inline void buzzer_sequence_hold(void){
+// Synchronous, 1 second
+static inline void buzzer_sequence_hold_one_second(void){
     set_pin(GPIO_LINE_BUZZER, 1);
     SLEEP_MILISECONDS(500);
     set_pin(GPIO_LINE_BUZZER, 0);
     SLEEP_MILISECONDS(500);
-    set_pin(GPIO_LINE_BUZZER, 1);
-    SLEEP_MILISECONDS(500);
-    set_pin(GPIO_LINE_BUZZER, 0);
-    SLEEP_MILISECONDS(500);
-    set_pin(GPIO_LINE_BUZZER, 1);
-    SLEEP_MILISECONDS(500);
-    set_pin(GPIO_LINE_BUZZER, 0);
-    SLEEP_MILISECONDS(500);
-
 }
 
 static inline void red_led_capture_start(){
@@ -435,13 +426,30 @@ void* capture_periodic_runner(void* arg){
 
         action_sitstand_swap();
 
-
         if(!state.capture.enable){
 
             if(state.action.policies[state.action.current].action_hold){
-                state.capture.enable = true;
-                buzzer_sequence_hold();
+
+                // Only enable early if hold_nolabel is true
+                if(state.action.policies[state.action.current].action_hold_nolabel){
+                    state.capture.is_labeling = false;
+                    state.capture.enable = true;
+                }
+
+                uint64_t hold_seconds_final = state.action.policies[state.action.current].action_hold_seconds;
+                if(hold_seconds_final == 0){
+                    hold_seconds_final = 3;
+                }
+                for(uint64_t i = 0; i < hold_seconds_final; i++){
+                    buzzer_sequence_hold_one_second();
+                }
+                
+
+                // After hold sequence while enabled, labeling is switched to true, labeling is enabled
+                // If no hold was issued, labeling is directly set to true and capture is enabled
                 state.capture.is_labeling = true;
+                state.capture.enable = true; // Ensure it is on for the actual action
+
             }else{
                 state.capture.is_labeling = true;
                 state.capture.enable = true;
@@ -492,41 +500,50 @@ void* capture_periodic_runner(void* arg){
 }
 
 void start_capture_continuous(void){
+
+    if(state.action.current == ACTION_SITSTAND){
+        LOG(WARN, "ir_label: Action ACTION_SITSTAND is not allowed in continuous mode");
+        return;
+    }
+
     LOG(INFO, "ir_label: Starting continuous capture...");
     
+    state.action.index[state.action.effective] = 0;
+
     if(state.action.policies[state.action.current].action_hold){
-        buzzer_sequence_hold();
+        
+        uint64_t hold_seconds_final = state.action.policies[state.action.current].action_hold_seconds;
+        
+        if(hold_seconds_final == 0){
+            hold_seconds_final = 3; 
+        }
+        
+        for(uint64_t i = 0; i < hold_seconds_final; i++){
+            buzzer_sequence_hold_one_second();
+        }
     }
 
     red_led_capture_start();
     async_buzzer_enqueue(ASYNC_BUZZER_CODE_CAPTURE_START);
 
-
-    state.action.index[state.action.effective] = 0;
     state.capture.is_recording = true;
     state.capture.is_labeling = true;
     state.capture.enable = true;
 }
 
 void stop_capture_continuous(void){
+
     LOG(INFO, "ir_label: Stopping continuous capture...");
 
     state.capture.enable = false;
     state.capture.is_labeling = false;
 
-    if(state.action.current == ACTION_SITSTAND){
-        return;
-    }
-    if(state.action.policies[state.action.current].action_hold){
-        buzzer_sequence_hold();
-    }
-
     red_led_capture_stop();
     async_buzzer_enqueue(ASYNC_BUZZER_CODE_CAPTURE_STOP);
 
+    state.action.index[state.action.effective] = 0;
 
     state.capture.is_recording = false;
-    state.action.index[state.action.effective] = 0;
 }
 
 void start_capture_periodic(void){
@@ -873,7 +890,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     }
     if(config_lookup_bool(&state.config_file, "action.walk.hold", &temp_int)){
         state.action.policies[ACTION_WALK].action_hold = temp_int;
-    }   
+    }
+    if(config_lookup_bool(&state.config_file, "action.walk.hold_nolabel", &temp_int)){
+        state.action.policies[ACTION_WALK].action_hold_nolabel = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.walk.hold_seconds", &temp_int64)){
+        state.action.policies[ACTION_WALK].action_hold_seconds = temp_int64;
+    }          
     if(config_lookup_int64(&state.config_file, "action.walk.count", &temp_int64)){
         state.action.policies[ACTION_WALK].action_count = temp_int64;
     }
@@ -891,7 +914,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     }        
     if(config_lookup_bool(&state.config_file, "action.run.hold", &temp_int)){
         state.action.policies[ACTION_RUN].action_hold = temp_int;
-    }   
+    }
+    if(config_lookup_bool(&state.config_file, "action.run.hold_nolabel", &temp_int)){
+        state.action.policies[ACTION_RUN].action_hold_nolabel = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.run.hold_seconds", &temp_int64)){
+        state.action.policies[ACTION_RUN].action_hold_seconds = temp_int64;
+    }        
     if(config_lookup_int64(&state.config_file, "action.run.count", &temp_int64)){
         state.action.policies[ACTION_RUN].action_count = temp_int64;
     }
@@ -909,7 +938,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     }            
     if(config_lookup_bool(&state.config_file, "action.jump.hold", &temp_int)){
         state.action.policies[ACTION_JUMP].action_hold = temp_int;
-    }   
+    }
+    if(config_lookup_bool(&state.config_file, "action.jump.hold_nolabel", &temp_int)){
+        state.action.policies[ACTION_JUMP].action_hold_nolabel = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.jump.hold_seconds", &temp_int64)){
+        state.action.policies[ACTION_JUMP].action_hold_seconds = temp_int64;
+    }    
     if(config_lookup_int64(&state.config_file, "action.jump.count", &temp_int64)){
         state.action.policies[ACTION_JUMP].action_count = temp_int64;
     }
@@ -926,7 +961,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     }     
     if(config_lookup_bool(&state.config_file, "action.still.hold", &temp_int)){
         state.action.policies[ACTION_STILL].action_hold = temp_int;
-    }   
+    }
+    if(config_lookup_bool(&state.config_file, "action.still.hold_nolabel", &temp_int)){
+        state.action.policies[ACTION_STILL].action_hold_nolabel = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.still.hold_seconds", &temp_int64)){
+        state.action.policies[ACTION_STILL].action_hold_seconds = temp_int64;
+    }
     if(config_lookup_int64(&state.config_file, "action.still.count", &temp_int64)){
         state.action.policies[ACTION_STILL].action_count = temp_int64;
     }
@@ -943,7 +984,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     }     
     if(config_lookup_bool(&state.config_file, "action.standup.hold", &temp_int)){
         state.action.policies[ACTION_STANDUP].action_hold = temp_int;
-    }   
+    }
+    if(config_lookup_bool(&state.config_file, "action.standup.hold_nolabel", &temp_int)){
+        state.action.policies[ACTION_STANDUP].action_hold_nolabel = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.standup.hold_seconds", &temp_int64)){
+        state.action.policies[ACTION_STANDUP].action_hold_seconds = temp_int64;
+    }    
     if(config_lookup_int64(&state.config_file, "action.standup.count", &temp_int64)){
         state.action.policies[ACTION_STANDUP].action_count = temp_int64;
     }
@@ -961,7 +1008,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     }    
     if(config_lookup_bool(&state.config_file, "action.sitdown.hold", &temp_int)){
         state.action.policies[ACTION_SITDOWN].action_hold = temp_int;
-    }   
+    }
+    if(config_lookup_bool(&state.config_file, "action.sitdown.hold_nolabel", &temp_int)){
+        state.action.policies[ACTION_SITDOWN].action_hold_nolabel = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.sitdown.hold_seconds", &temp_int64)){
+        state.action.policies[ACTION_SITDOWN].action_hold_seconds = temp_int64;
+    }    
     if(config_lookup_int64(&state.config_file, "action.sitdown.count", &temp_int64)){
         state.action.policies[ACTION_SITDOWN].action_count = temp_int64;
     }
@@ -978,7 +1031,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     }    
     if(config_lookup_bool(&state.config_file, "action.sitstand.hold", &temp_int)){
         state.action.policies[ACTION_SITSTAND].action_hold = temp_int;
-    }   
+    }
+    if(config_lookup_bool(&state.config_file, "action.sitstand.hold_nolabel", &temp_int)){
+        state.action.policies[ACTION_SITSTAND].action_hold_nolabel = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.sitstand.hold_seconds", &temp_int64)){
+        state.action.policies[ACTION_SITSTAND].action_hold_seconds = temp_int64;
+    }    
     if(config_lookup_int64(&state.config_file, "action.sitstand.count", &temp_int64)){
         state.action.policies[ACTION_SITSTAND].action_count = temp_int64;
     }
@@ -996,10 +1055,15 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(config_lookup_bool(&state.config_file, "action.fall.hold", &temp_int)){
         state.action.policies[ACTION_FALL].action_hold = temp_int;
     }
+    if(config_lookup_bool(&state.config_file, "action.fall.hold_nolabel", &temp_int)){
+        state.action.policies[ACTION_FALL].action_hold_nolabel = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.fall.hold_seconds", &temp_int64)){
+        state.action.policies[ACTION_FALL].action_hold_seconds = temp_int64;
+    }    
     if(config_lookup_int64(&state.config_file, "action.fall.count", &temp_int64)){
         state.action.policies[ACTION_FALL].action_count = temp_int64;
     }
-
 
     config_destroy(&state.config_file);
 
