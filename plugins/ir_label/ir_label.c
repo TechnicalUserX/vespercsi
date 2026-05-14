@@ -190,7 +190,7 @@ int close_out(bool discard){
             if(remove(state.out.fd_path) != 0){
                 LOG(WARN, "ir_label: Cannot discard the file: %s", state.out.fd_path);
             }else{
-                LOG_VERBOSE(VERBOSITY_0, INFO, "ir_label: File discarded: %s", state.out.fd_path);
+                LOG(INFO, "ir_label: File discarded: %s", state.out.fd_path);
             }
         }else{
             if(state.out.include.index && state.capture.index_autoincrement){
