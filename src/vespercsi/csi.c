@@ -259,8 +259,13 @@ int vespercsi_csi_capture_handler(struct nl_msg *msg, void *arg){
 
             unsigned int data_length = nla_len(attrs[IWL_MVM_VENDOR_ATTR_CSI_DATA]);
 
-            if (data_length > VESPERCSI_CSI_DATA_SIZE_MAX) {
-                LOG_VERBOSE(VERBOSITY_2, WARN, "Capture: Received CSI payload too large: %u bytes", data_length);
+            if(data_length != current_csi_metadata.header.csi_data_size){
+                LOG_VERBOSE(VERBOSITY_1, WARN, "Capture: Received CSI payload size mismatch: data_length: %u, header.csi_data_size: %u", data_length, current_csi_metadata.header.csi_data_size);
+                return NL_SKIP;
+            }
+
+            if(data_length > VESPERCSI_CSI_DATA_SIZE_MAX) {
+                LOG_VERBOSE(VERBOSITY_1, WARN, "Capture: Received CSI payload too large: %u bytes", data_length);
                 return NL_SKIP;
             }
 
