@@ -71,6 +71,7 @@ const char* action_to_string(action_t action){
         case ACTION_SITDOWN:    return "SITDOWN";
         case ACTION_SITSTAND:   return "SITSTAND";
         case ACTION_FALL:       return "FALL";
+        case ACTION_EMPTY:      return "EMPTY";
         default:
         case ACTION_NOLABEL:    return "UNKNOWN";
     }
@@ -296,6 +297,7 @@ label_t action_to_label(action_t action){
         case ACTION_SITDOWN:    return 6;
         case ACTION_SITSTAND:   return 7;
         case ACTION_FALL:       return 8;
+        case ACTION_EMPTY:      return 9;
         case ACTION_NOLABEL:    return 0;
     }
 }
@@ -311,6 +313,7 @@ action_t command_to_action(command_t cmd){
         case COMMAND_SET_ACTION_SITDOWN:    return ACTION_SITDOWN;
         case COMMAND_SET_ACTION_SITSTAND:   return ACTION_SITSTAND;
         case COMMAND_SET_ACTION_FALL:       return ACTION_FALL;
+        case COMMAND_SET_ACTION_EMPTY:      return ACTION_EMPTY;
         default:                            return ACTION_NOLABEL;
     }
 }
@@ -637,7 +640,8 @@ void command_interpreter(command_t cmd){
         case COMMAND_SET_ACTION_STANDUP:
         case COMMAND_SET_ACTION_SITDOWN:
         case COMMAND_SET_ACTION_SITSTAND:
-        case COMMAND_SET_ACTION_FALL:{
+        case COMMAND_SET_ACTION_FALL:
+        case COMMAND_SET_ACTION_EMPTY:{
 
             if(!state.capture.is_recording){
 
@@ -1064,6 +1068,31 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     if(config_lookup_int64(&state.config_file, "action.fall.count", &temp_int64)){
         state.action.policies[ACTION_FALL].action_count = temp_int64;
     }
+
+    // Empty
+    if(config_lookup_bool(&state.config_file, "action.empty.periodic", &temp_int)){
+        state.action.policies[ACTION_EMPTY].is_periodic = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.empty.duration", &temp_int64)){
+        state.action.policies[ACTION_EMPTY].action_duration = temp_int64;
+    }
+    if(config_lookup_int64(&state.config_file, "action.empty.wait", &temp_int64)){
+        state.action.policies[ACTION_EMPTY].action_wait = temp_int64;
+    }
+    if(config_lookup_bool(&state.config_file, "action.empty.hold", &temp_int)){
+        state.action.policies[ACTION_EMPTY].action_hold = temp_int;
+    }
+    if(config_lookup_bool(&state.config_file, "action.empty.hold_nolabel", &temp_int)){
+        state.action.policies[ACTION_EMPTY].action_hold_nolabel = temp_int;
+    }
+    if(config_lookup_int64(&state.config_file, "action.empty.hold_seconds", &temp_int64)){
+        state.action.policies[ACTION_EMPTY].action_hold_seconds = temp_int64;
+    }    
+    if(config_lookup_int64(&state.config_file, "action.empty.count", &temp_int64)){
+        state.action.policies[ACTION_EMPTY].action_count = temp_int64;
+    }
+
+
 
     config_destroy(&state.config_file);
 

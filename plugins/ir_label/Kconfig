@@ -88,17 +88,21 @@ menuconfig VESPERCSI_PLUGIN_IR_LABEL
             hex "Set current action to fall"
             default 0x10
 
+        config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_SET_ACTION_EMPTY
+            hex "Set current action to empty"
+            default 0x11
+
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_INCREASE
             hex "Increase capture index (affects record file naming)"
-            default 0x11
+            default 0x12
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_DECREASE
             hex "Decrease capture index (affects record file naming)"
-            default 0x12            
+            default 0x13            
 
         config VESPERCSI_PLUGIN_IR_LABEL_COMMAND_CAPTURE_INDEX_TOGGLE_AUTOINCREMENT
             hex "Toggle capture index auto increment (affects record file naming)"
-            default 0x13
+            default 0x14
 
     endif
 
