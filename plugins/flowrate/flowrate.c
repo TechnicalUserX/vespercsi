@@ -1,4 +1,4 @@
-#include <vespercsi/plugin.h>
+#include <vespercsi/plugin/sdk.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -194,8 +194,13 @@ void* render_loop(void* arg) {
     return NULL;
 }
 
-int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
+int vespercsi_plugin_api_init(vespercsi_plugin_context_t* context){
     vespercsi_plugin_context = *context;
+
+    if(vespercsi_plugin_context.sdk_version != VESPERCSI_PLUGIN_SDK_VERSION){
+        LOG(FAIL, "flowrate: Plugin SDK version mismatch");
+        return VESPERCSI_FAIL;
+    }
 
     // Get terminal dimensions
     struct winsize w;
@@ -229,13 +234,13 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     return VESPERCSI_OK;
 }
 
-int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
+int vespercsi_plugin_api_callback(const vespercsi_csi_t* csi){
     // Lock-free increment guarantees maximum callback throughput
     atomic_fetch_add(&current_bucket_count, 1);
     return VESPERCSI_OK;
 }
 
-int vespercsi_plugin_function_destroy(void){
+int vespercsi_plugin_api_destroy(void){
     // Signal thread to stop and wait
     atomic_store(&keep_running, false);
     pthread_join(render_thread, NULL);

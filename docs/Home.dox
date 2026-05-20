@@ -2,7 +2,7 @@
 
 **Welcome to the VesperCSI documentation!**
 
-VesperCSI is designed to work efficiently and faster on Embedded Linux platforms. It is a derivative work of FeitCSI. <br> 
+VesperCSI is designed to make it possible to . It is a hard fork of FeitCSI. <br> 
 Checkout FeitCSI: https://feitcsi.kuskosoft.com/
 
 ---
@@ -19,8 +19,8 @@ Checkout FeitCSI: https://feitcsi.kuskosoft.com/
 
 **Special Thanks**
 
-- Yiğit Can Çelik
-- Mustafa Emre Çiftçi
+- Yiğit Can Çelik ([@ygtcnclk](https://github.com/ygtcnclk))
+- Erdem Bera Emiroğlu ([@ebera01](https://github.com/ebera01))
 
 ---
 

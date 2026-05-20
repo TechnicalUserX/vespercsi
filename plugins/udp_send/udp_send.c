@@ -1,4 +1,4 @@
-#include <vespercsi/plugin.h>
+#include <vespercsi/plugin/sdk.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -15,9 +15,14 @@ static int sockfd = -1;
 static struct sockaddr_in dest_addr;
 static bool plugin_ready = false;
 
-int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context) {
+int vespercsi_plugin_api_init(vespercsi_plugin_context_t* context) {
     vespercsi_plugin_context = *context;
     
+    if(vespercsi_plugin_context.sdk_version != VESPERCSI_PLUGIN_SDK_VERSION){
+        LOG(FAIL, "udp_send: Plugin SDK version mismatch");
+        return VESPERCSI_FAIL;
+    }
+
     config_t cfg;
     config_init(&cfg);
 
@@ -66,7 +71,7 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context) {
     return VESPERCSI_OK;
 }
 
-int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi) {
+int vespercsi_plugin_api_callback(const vespercsi_csi_t* csi) {
     if (!plugin_ready || sockfd < 0) {
         return VESPERCSI_FAIL;
     }
@@ -100,7 +105,7 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi) {
     return VESPERCSI_OK;
 }
 
-int vespercsi_plugin_function_destroy(void) {
+int vespercsi_plugin_api_destroy(void) {
     if (sockfd >= 0) {
         close(sockfd);
         sockfd = -1;

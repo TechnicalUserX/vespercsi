@@ -1,0 +1,8 @@
+#ifndef VESPERCSI_LOG_VERBOSITY_H
+#define VESPERCSI_LOG_VERBOSITY_H
+
+#define VERBOSITY_0 0
+#define VERBOSITY_1 1
+#define VERBOSITY_2 2
+
+#endif

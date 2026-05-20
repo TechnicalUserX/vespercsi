@@ -1,5 +1,5 @@
+#include <vespercsi/plugin/sdk.h>
 #include <libconfig.h>
-#include <vespercsi/plugin.h>
 #include "ir_label.h"
 
 vespercsi_plugin_context_t vespercsi_plugin_context = {0};
@@ -765,8 +765,13 @@ void free_resources(void){
     pthread_mutex_unlock(&state.out.fd_lock);
 }
 
-int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
+int vespercsi_plugin_api_init(vespercsi_plugin_context_t* context){
     vespercsi_plugin_context = *context;
+
+    if(vespercsi_plugin_context.sdk_version != VESPERCSI_PLUGIN_SDK_VERSION){
+        LOG(FAIL, "ir_label: Plugin SDK version mismatch");
+        return VESPERCSI_FAIL;
+    }
 
     if(state_init() == VESPERCSI_FAIL){
         LOG(FAIL, "ir_label: Cannot set initial state");
@@ -1215,7 +1220,7 @@ int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
     return VESPERCSI_OK;
 }
 
-int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
+int vespercsi_plugin_api_callback(const vespercsi_csi_t* csi){
 
     if(state.capture.enable){
         // Critical Area //
@@ -1313,7 +1318,7 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
     return VESPERCSI_OK;
 }
 
-int vespercsi_plugin_function_destroy(void){
+int vespercsi_plugin_api_destroy(void){
 
     LOG_VERBOSE(VERBOSITY_1, INFO, "ir_label: Stopping infrared_runner thread");
 

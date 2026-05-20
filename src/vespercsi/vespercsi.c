@@ -30,12 +30,21 @@ int main(int argc, char* argv[]){
     }
 
     //==========================================================//
+    //======================= Daemon Mode ======================//
+
+    if(vespercsi_options.daemon){
+        if (daemon(0, 0) < 0) {
+            printf("VesperCSI: Failed to daemonize");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    //==========================================================//
     //==================== Initialization ======================//
 
     vespercsi_log_init();
 
     vespercsi_signal_init();
-
 
     vespercsi_wifi_controller_init(&vespercsi_wifi_controller);
 

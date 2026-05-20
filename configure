@@ -1,5 +1,5 @@
 #!/bin/bash
-# Configuration script for C/C++ (c) 2024-2026 TechnicalUserX (Kaan Baydemir)
+# Configuration script for C/C++ (c) 2024-2026 TechnicalUserX
 # Out-of-source build is adopted
 
 # shellcheck disable=SC2034
@@ -10,7 +10,7 @@
 # Project (MODIFY HERE)
 
 PROJECT="VesperCSI"
-PROJECT_BRIEF="A Derivative Work of FeitCSI for Embedded Linux"
+PROJECT_BRIEF="High Performance And Extensible CSI Multitool For Intel AX200/AX210 Wi-Fi Cards"
 
 ########################################
 # Targets
@@ -19,7 +19,7 @@ PROJECT_BRIEF="A Derivative Work of FeitCSI for Embedded Linux"
 TARGETS=""
 
 # Available Targets (MODIFY HERE)
-TARGETS_AVAILABLE="vespercsi vespercsi-viewer print-details udp-send packet-checker ir-label flowrate"
+TARGETS_AVAILABLE="vespercsi vespercsi-viewer print-details udp-send ir-label flowrate"
 
 ########################################
 # Default Source Extensions (MODIFY HERE)
@@ -643,7 +643,7 @@ BUILD_HDR_DIR="${BUILD_DIR}/include"
 
 CC="gcc"
 CXX="g++"
-CFLAGS="-Werror -Wall -I\"${ROOT_DIR}/src\" -I\"${ROOT_DIR}/lib\" -I\"${BUILD_HDR_DIR}\" -I/usr/include/libnl3"
+CFLAGS="-Werror -Wall -I\"${ROOT_DIR}/include\" -I\"${ROOT_DIR}/src\" -I\"${ROOT_DIR}/lib\" -I\"${BUILD_HDR_DIR}\" -I/usr/include/libnl3"
 CPPFLAGS=""
 CXXFLAGS=""
 LDFLAGS="-lnl-genl-3 -lnl-3 -lm -lconfig" 
@@ -860,14 +860,6 @@ for target in ${TARGETS}; do
             else
                 config_log FAIL "${PROJECT} Plugin sources: udp-send"
             fi
-        ;;
-
-        packet-checker)
-            if config_sources "$target" "plugins/packet_checker"; then
-                config_log PASS "${PROJECT} Plugin sources: packet-checker"
-            else
-                config_log FAIL "${PROJECT} Plugin sources: packet-checker"
-            fi        
         ;;
 
         ir-label)

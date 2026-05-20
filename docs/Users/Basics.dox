@@ -77,8 +77,11 @@ vespercsi -i aa:bb:cc:dd:ee:ff --quiet
 - The captured CSI data can be written to a file:
 
 ```shell
-vespercsi -i aa:bb:cc:dd:ee:ff --out-file mycsi.dat
+vespercsi -i aa:bb:cc:dd:ee:ff --out mycsi.dat
 ```
+
+> This file output is identical to FeitCSI output format.
+
 
 ---
 

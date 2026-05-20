@@ -9,23 +9,30 @@ Capture Settings:
   -i, --interface-mac <mac>   [Required] MAC address of the capture interface
   -f, --frequency <freq>      Center frequency in MHz (e.g., 2412, 5180)
   -w, --channel-width <width> Channel bandwidth [20|40|HT40-|80|160]
-  -t, --format <format>       CSI format [NOHT|HT|VHT|HESU]
+  -F, --format <format>       CSI format [NOHT|HT|VHT|HESU]
+  -r, --num-rx <num>          Number of RX antennas (1 or 2)
+  -t, --num-tx <num>          Number of TX antennas (1 or 2)
 
 Filtering Options:
   -s, --src-mac <mac>         Filter incoming packets by source MAC address
   -u, --unrestricted          Do not restrict capture to matched channel width and format
 
 Output & Plugins:
-  -o, --out-file <file>       Path to write raw CSI data
-  -p, --plugin <path>         Path to load an external shared library plugin (.vesper)
-  -c, --config-file <file>    Path to configuration file for extra functionality
+  -o, --out <file>            Path to write raw CSI data
+  -p, --plugin <path>         Path to load an external shared library plugin (.so)
+  -P, --plugin-config <file>  Path to configuration file for the loaded plugin
+  -c, --config <file>         Path to VesperCSI configuration file for extra functionality
 
 Logging & Output Control:
-  -l, --log-file <file>       Path to write application logs
+  -l, --log <file>            Path to write application logs
   -v, --verbose[=level]       Enable verbose debug output (levels: 0, 1, 2)
-  -q, --quiet                 Suppress all console output (overrides verbose)
+  -q, --quiet                 Suppress all console output
 
-Miscellaneous:
+Advanced & Miscellaneous:
+  -d, --daemon                Run VesperCSI as a background daemon
+      --netlink-buffer-instant-death  Crash immediately on netlink buffer overflow
+      --ring-buffer-instant-death     Crash immediately on ring buffer overflow
+      --debug-constants       Print internal debug constants and exit
   -h, --help                  Show this help message and exit
       --version               Show program version and exit
 ```

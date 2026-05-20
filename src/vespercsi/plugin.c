@@ -1,9 +1,15 @@
+#include <vespercsi/plugin/defs.h>
+#include <vespercsi/plugin/compat.h>
+#include <vespercsi/plugin/types.h>
+#include <vespercsi/plugin/api.h>
+
 #include <vespercsi/plugin.h>
 #include <vespercsi/config.h>
 
 vespercsi_plugin_t vespercsi_plugin = {0};
 
 void vespercsi_plugin_load(void){
+    
     if(vespercsi_plugin.set == false){
         return;
     }
@@ -20,8 +26,14 @@ void vespercsi_plugin_load(void){
 
     if(strcmp(plugin_path_dirname, ".") == 0 && strstr(vespercsi_plugin.path, "/") == NULL){
         // Search under /etc/vespercsi/plugins
-        char search_path[512] = VESPERCSI_PLUGIN_FOLDER "/";
-        strncat(search_path, vespercsi_plugin.path, sizeof(search_path)-1-sizeof(VESPERCSI_PLUGIN_FOLDER));
+        char search_path[PATH_MAX] = VESPERCSI_PLUGIN_FOLDER "/";
+
+        strlcat(search_path, vespercsi_plugin.path, PATH_MAX);
+
+        if(strstr(search_path, ".vesper") == NULL){
+            strlcat(search_path, ".vesper", PATH_MAX);
+        }
+
         handle = dlopen(search_path, RTLD_NOW | RTLD_LOCAL);
         if (!handle) {
             fprintf(stdout, "VesperCSI: Plugin load failed: %s\n", dlerror());
@@ -40,30 +52,30 @@ void vespercsi_plugin_load(void){
     dlerror();
 
     // Required symbol
-    vespercsi_plugin_function_callback_t callback = (vespercsi_plugin_function_callback_t)dlsym(handle, "vespercsi_plugin_function_callback");
+    vespercsi_plugin_api_callback_t callback = (vespercsi_plugin_api_callback_t)dlsym(handle, "vespercsi_plugin_api_callback");
 
     const char* err = dlerror();
     if (err) {
-        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_callback: %s\n", err);
+        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_api_callback: %s\n", err);
         dlclose(handle);
         exit(EXIT_FAILURE);
     }
 
     // Optional symbols — missing is fine
-    vespercsi_plugin_function_init_t init = (vespercsi_plugin_function_init_t)dlsym(handle, "vespercsi_plugin_function_init");
+    vespercsi_plugin_api_init_t init = (vespercsi_plugin_api_init_t)dlsym(handle, "vespercsi_plugin_api_init");
     
     err = dlerror();
     if (err) {
-        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_init: %s\n", err);
+        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_api_init: %s\n", err);
         dlclose(handle);
         exit(EXIT_FAILURE);
     }
 
-    vespercsi_plugin_function_destroy_t destroy = (vespercsi_plugin_function_destroy_t)dlsym(handle, "vespercsi_plugin_function_destroy");
+    vespercsi_plugin_api_destroy_t destroy = (vespercsi_plugin_api_destroy_t)dlsym(handle, "vespercsi_plugin_api_destroy");
     
     err = dlerror();
-    if (err) {
-        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_function_destroy: %s\n", err);
+    if(err) {
+        fprintf(stdout, "VesperCSI: Plugin missing required symbol vespercsi_plugin_api_destroy: %s\n", err);
         dlclose(handle);
         exit(EXIT_FAILURE);
     }
@@ -97,7 +109,6 @@ void vespercsi_plugin_load(void){
 
     return;
 }
-
 
 void vespercsi_plugin_unload(void) {
     if (!vespercsi_plugin.loaded) return;

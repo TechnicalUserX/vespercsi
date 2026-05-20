@@ -3,11 +3,13 @@ If:
 
 CompileFlags:
     Add:
-        - -I/home/tux/VesperCSI/vespercsi/src
-        - -I/home/tux/VesperCSI/vespercsi/lib
-        - -I/home/tux/VesperCSI/vesperos/output/host/aarch64-buildroot-linux-gnu/sysroot/usr/include
-        - -I/home/tux/VesperCSI/vesperos/output/host/aarch64-buildroot-linux-gnu/sysroot/usr/include/libnl3
-        - -I/home/tux/VesperCSI/vespercsi/build/include
+        - -I/home/tux/VesperTUX/vespercsi/src
+        - -I/home/tux/VesperTUX/vespercsi/lib
+        - -I/usr/include
+        - -I/usr/include/libnl3
+        - -I/home/tux/VesperTUX/vespercsi/build/include
+        - -I/home/tux/VesperTUX/vespercsi/include
+
     Compiler: clang
 
 ---
@@ -17,7 +19,7 @@ If:
     
 CompileFlags:
     Add:
-        - -I/home/tux/VesperCSI/vespercsi/include
+        - -I/home/tux/VesperTUX/vespercsi/include
 
 ---
 
@@ -59,3 +61,12 @@ CompileFlags:
         - -lgio-2.0 
         - -lgobject-2.0
         - -lglib-2.0
+
+---
+
+If:
+    PathMatch: include/*.*
+    
+CompileFlags:
+    Add:
+        - -I/home/tux/VesperTUX/vespercsi/include

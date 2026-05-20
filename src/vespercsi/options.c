@@ -5,7 +5,6 @@
 #include <vespercsi/debug.h>
 #include <vespercsi/version.h>
 
-
 // Global Options Struct
 vespercsi_options_t vespercsi_options = {
     .interface_mac_set = false,
@@ -90,8 +89,6 @@ void vespercsi_options_parse(int argc, char* argv[]){
             }break;
 
             case 'q':{
-                vespercsi_options.verbose = false;
-                vespercsi_options.verbosity = 0;
                 vespercsi_options.quiet = true;
             }break;            
 
@@ -261,20 +258,27 @@ void vespercsi_options_print_usage() {
         "  -i, --interface-mac <mac>   [Required] MAC address of the capture interface\n"
         "  -f, --frequency <freq>      Center frequency in MHz (e.g., 2412, 5180)\n"
         "  -w, --channel-width <width> Channel bandwidth [20|40|HT40-|80|160]\n"
-        "  -t, --format <format>       CSI format [NOHT|HT|VHT|HESU]\n\n"
+        "  -F, --format <format>       CSI format [NOHT|HT|VHT|HESU]\n"
+        "  -r, --num-rx <num>          Number of RX antennas (1 or 2)\n"
+        "  -t, --num-tx <num>          Number of TX antennas (1 or 2)\n\n"
         "Filtering Options:\n"
         "  -s, --src-mac <mac>         Filter incoming packets by source MAC address\n"
         "  -u, --unrestricted          Do not restrict capture to matched channel width and format\n\n"
         "Output & Plugins:\n"
-        "  -o, --out-file <file>       Path to write raw CSI data\n"
+        "  -o, --out <file>            Path to write raw CSI data\n"
         "  -p, --plugin <path>         Path to load an external shared library plugin (.so)\n"
-        "  -c, --config-file <file>    Path to configuration file for extra functionality\n\n"
+        "  -P, --plugin-config <file>  Path to configuration file for the loaded plugin\n"
+        "  -c, --config <file>         Path to VesperCSI configuration file for extra functionality\n\n"
         "Logging & Output Control:\n"
-        "  -l, --log-file <file>       Path to write application logs\n"
+        "  -l, --log <file>            Path to write application logs\n"
         "  -v, --verbose[=level]       Enable verbose debug output (levels: 0, 1, 2)\n"
-        "  -q, --quiet                 Suppress all console output (overrides verbose)\n\n"
-        "Miscellaneous:\n"
+        "  -q, --quiet                 Suppress all console output\n\n"
+        "Advanced & Miscellaneous:\n"
+        "  -d, --daemon                Run VesperCSI as a background daemon\n"
+        "      --netlink-buffer-instant-death  Crash immediately on netlink buffer overflow\n"
+        "      --ring-buffer-instant-death     Crash immediately on ring buffer overflow\n"
+        "      --debug-constants       Print internal debug constants and exit\n"
         "  -h, --help                  Show this help message and exit\n"
         "      --version               Show program version and exit\n"
-    );    
+    );  
 }

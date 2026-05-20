@@ -1,14 +1,36 @@
-#include <vespercsi/plugin.h>
+#include <vespercsi/plugin/sdk.h>
+#include <string.h>
+
+#define VESPERCSI_RATE_MCS_MOD_TYPE_POS     8
+#define VESPERCSI_RATE_MCS_MOD_TYPE_MSK     (0x7 << VESPERCSI_RATE_MCS_MOD_TYPE_POS)
+#define VESPERCSI_RATE_MCS_LEGACY_OFDM_MSK  (1 << VESPERCSI_RATE_MCS_MOD_TYPE_POS)
+#define VESPERCSI_RATE_MCS_HT_MSK           (2 << VESPERCSI_RATE_MCS_MOD_TYPE_POS)
+#define VESPERCSI_RATE_MCS_VHT_MSK          (3 << VESPERCSI_RATE_MCS_MOD_TYPE_POS)
+#define VESPERCSI_RATE_MCS_HE_MSK           (4 << VESPERCSI_RATE_MCS_MOD_TYPE_POS)
+#define VESPERCSI_RATE_MCS_EHT_MSK          (5 << VESPERCSI_RATE_MCS_MOD_TYPE_POS)
+
+#define VESPERCSI_RATE_MCS_CHAN_WIDTH_POS    11
+#define VESPERCSI_RATE_MCS_CHAN_WIDTH_MSK    (0x7 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
+#define VESPERCSI_RATE_MCS_CHAN_WIDTH_20     (0 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
+#define VESPERCSI_RATE_MCS_CHAN_WIDTH_40     (1 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
+#define VESPERCSI_RATE_MCS_CHAN_WIDTH_80     (2 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
+#define VESPERCSI_RATE_MCS_CHAN_WIDTH_160    (3 << VESPERCSI_RATE_MCS_CHAN_WIDTH_POS)
 
 vespercsi_plugin_context_t vespercsi_plugin_context;
 
-int vespercsi_plugin_function_init(vespercsi_plugin_context_t* context){
+int vespercsi_plugin_api_init(vespercsi_plugin_context_t* context){
     vespercsi_plugin_context = *context;
+
+    if(vespercsi_plugin_context.sdk_version != VESPERCSI_PLUGIN_SDK_VERSION){
+        LOG(FAIL, "print_details: Plugin SDK version mismatch");
+        return VESPERCSI_FAIL;
+    }
+
     LOG(INFO, "print_details: Plugin initalized");
     return  VESPERCSI_OK;
 }
 
-int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
+int vespercsi_plugin_api_callback(const vespercsi_csi_t* csi){
 
     static uint64_t csi_counter = 0;
 
@@ -68,7 +90,7 @@ int vespercsi_plugin_function_callback(const vespercsi_csi_t* csi){
     return VESPERCSI_OK;                                                                            
 }
 
-int vespercsi_plugin_function_destroy(void){
+int vespercsi_plugin_api_destroy(void){
     LOG(INFO, "print_details: Plugin destroyed");
     return VESPERCSI_OK;
 }
