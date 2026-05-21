@@ -9,22 +9,20 @@
 #include <unistd.h>
 #include <stdint.h>
 
-#ifdef CONFIG_VESPERCSI_PLUGIN_LIVESTD_FIXED_Y_MAX
-    #define FIXED_Y_MAX CONFIG_VESPERCSI_PLUGIN_LIVESTD_FIXED_Y_MAX
-#else
-    #define FIXED_Y_MAX 16.0
-#endif
-
 vespercsi_plugin_context_t vespercsi_plugin_context;
 
 // --- Configuration ---
 #define PLOT_WIDTH 80
 #define PLOT_HEIGHT 20
-#define WINDOW_SIZE 30
 #define RENDER_INTERVAL_US 100000 // 100ms (10 FPS)
+
+// Max packets to buffer per 100ms tick. 
+// 1000 allows for up to 10,000 Hz frequencies safely.
+#define MAX_PACKETS_PER_TICK 1000 
 
 // --- Signal Processing Thresholds ---
 #define NOISE_THRESHOLD 0.3 // Ignore standard deviations below this (forces to 0)
+#define FIXED_Y_MAX 10.0    // The absolute maximum STD value for the vertical axis
 
 // Max flattened elements per packet (244 subcarriers * 2 TX * 2 RX = 976)
 #define MAX_ELEMENTS (VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX * VESPERCSI_CSI_SUPPORTED_TX_MAX * VESPERCSI_CSI_SUPPORTED_RX_MAX)
@@ -34,10 +32,10 @@ pthread_t render_thread;
 pthread_mutex_t data_lock = PTHREAD_MUTEX_INITIALIZER;
 int plugin_running = 1;
 
-// Sliding window for CSI amplitude
-double amp_window[MAX_ELEMENTS][WINDOW_SIZE];
-int window_idx = 0;
-int window_count = 0;
+// Time-based bucket for CSI amplitude
+double amp_buffer[MAX_ELEMENTS][MAX_PACKETS_PER_TICK];
+int packet_count = 0;
+int latest_total_elements = 0; // Tracks the actual dimension size
 
 // Graph history buffer
 double graph_history[PLOT_WIDTH] = {0};
@@ -49,7 +47,44 @@ void* render_loop(void* arg) {
     while (plugin_running) {
         pthread_mutex_lock(&data_lock);
         
-        // Use the fixed absolute maximum for the Y-axis
+        // 1. Process the Time-Based Bucket
+        int N = packet_count;
+        int elements = latest_total_elements;
+        double current_score = 0.0;
+
+        if (N > 1 && elements > 0) {
+            double total_std = 0.0;
+            for (int i = 0; i < elements; i++) {
+                double sum = 0.0, mean = 0.0, variance_sum = 0.0;
+                
+                for (int t = 0; t < N; t++) sum += amp_buffer[i][t];
+                mean = sum / N;
+                
+                for (int t = 0; t < N; t++) {
+                    double diff = amp_buffer[i][t] - mean;
+                    variance_sum += (diff * diff);
+                }
+                
+                total_std += sqrt(variance_sum / N);
+            }
+            current_score = total_std / elements;
+        }
+
+        // Empty the bucket for the next 100ms cycle
+        packet_count = 0;
+
+        // Apply Squelch / Noise Threshold
+        if (current_score < NOISE_THRESHOLD) {
+            current_score = 0.0;
+        }
+
+        // Shift graph history left and insert new score on the right
+        for (int i = 0; i < PLOT_WIDTH - 1; i++) {
+            graph_history[i] = graph_history[i + 1];
+        }
+        graph_history[PLOT_WIDTH - 1] = current_score;
+
+        // 2. Render the Graph
         double max_val = FIXED_Y_MAX; 
         
         // Clip any massive spikes to the fixed maximum so they don't break the display
@@ -79,6 +114,9 @@ void* render_loop(void* arg) {
             ptr += sprintf(ptr, "\n");
         }
         
+        // Optional: Show diagnostics at the bottom to verify packet flow
+        ptr += sprintf(ptr, "\n\033[93m[Diagnostics]\033[0m Packets processed in last 100ms: %d\n", N);
+
         pthread_mutex_unlock(&data_lock);
         
         printf("%s", screen_buffer);
@@ -103,7 +141,7 @@ int vespercsi_plugin_api_init(vespercsi_plugin_context_t* context) {
         return VESPERCSI_FAIL;
     }
 
-    memset(amp_window, 0, sizeof(amp_window));
+    memset(amp_buffer, 0, sizeof(amp_buffer));
     
     // Start background render thread
     if (pthread_create(&render_thread, NULL, render_loop, NULL) != 0) {
@@ -129,50 +167,22 @@ int vespercsi_plugin_api_callback(const vespercsi_csi_t* csi) {
 
     pthread_mutex_lock(&data_lock);
 
-    // Cast flat byte array to 16-bit integer array to extract real/imag parts
-    int16_t *raw_csi = (int16_t *)csi->data.csi_data;
-    
-    for (int i = 0; i < total_elements; i++) {
-        double real = (double)raw_csi[2 * i];
-        double imag = (double)raw_csi[(2 * i) + 1];
+    latest_total_elements = total_elements;
+
+    // Only add to buffer if we haven't hit the ceiling for this 100ms tick
+    if (packet_count < MAX_PACKETS_PER_TICK) {
+        // Cast flat byte array to 16-bit integer array to extract real/imag parts
+        int16_t *raw_csi = (int16_t *)csi->data.csi_data;
         
-        double amp = sqrt((real * real) + (imag * imag));
-        amp_window[i][window_idx] = amp;
-    }
-
-    window_idx = (window_idx + 1) % WINDOW_SIZE;
-    if (window_count < WINDOW_SIZE) window_count++;
-
-    // Compute Mean STD across all extracted elements
-    double total_std = 0.0;
-    if (window_count > 1) {
         for (int i = 0; i < total_elements; i++) {
-            double sum = 0.0, mean = 0.0, variance_sum = 0.0;
+            double real = (double)raw_csi[2 * i];
+            double imag = (double)raw_csi[(2 * i) + 1];
             
-            for (int t = 0; t < window_count; t++) sum += amp_window[i][t];
-            mean = sum / window_count;
-            
-            for (int t = 0; t < window_count; t++) {
-                double diff = amp_window[i][t] - mean;
-                variance_sum += (diff * diff);
-            }
-            
-            total_std += sqrt(variance_sum / window_count);
+            double amp = sqrt((real * real) + (imag * imag));
+            amp_buffer[i][packet_count] = amp;
         }
+        packet_count++;
     }
-    
-    double current_score = (total_elements > 0) ? (total_std / total_elements) : 0.0;
-
-    // Apply Squelch / Noise Threshold
-    if (current_score < NOISE_THRESHOLD) {
-        current_score = 0.0;
-    }
-
-    // Shift graph history left and insert new score on the right
-    for (int i = 0; i < PLOT_WIDTH - 1; i++) {
-        graph_history[i] = graph_history[i + 1];
-    }
-    graph_history[PLOT_WIDTH - 1] = current_score;
 
     pthread_mutex_unlock(&data_lock);
 
