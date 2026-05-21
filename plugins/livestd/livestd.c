@@ -18,9 +18,8 @@ vespercsi_plugin_context_t vespercsi_plugin_context;
 #define RENDER_INTERVAL_US 100000 // 100ms (10 FPS)
 
 // --- Signal Processing Thresholds ---
-// Tweak these if your specific hardware has a higher/lower baseline noise
 #define NOISE_THRESHOLD 0.3 // Ignore standard deviations below this (forces to 0)
-#define MIN_PLOT_MAX 3.0    // Prevents the graph from zooming in on microscopic static
+#define FIXED_Y_MAX 10.0    // The absolute maximum STD value for the vertical axis
 
 // Max flattened elements per packet (244 subcarriers * 2 TX * 2 RX = 976)
 #define MAX_ELEMENTS (VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX * VESPERCSI_CSI_SUPPORTED_TX_MAX * VESPERCSI_CSI_SUPPORTED_RX_MAX)
@@ -45,11 +44,13 @@ void* render_loop(void* arg) {
     while (plugin_running) {
         pthread_mutex_lock(&data_lock);
         
-        // Find dynamic max for scaling, but NEVER drop below MIN_PLOT_MAX
-        double max_val = MIN_PLOT_MAX; 
+        // Use the fixed absolute maximum for the Y-axis
+        double max_val = FIXED_Y_MAX; 
+        
+        // Clip any massive spikes to the fixed maximum so they don't break the display
         for (int i = 0; i < PLOT_WIDTH; i++) {
             if (graph_history[i] > max_val) {
-                max_val = graph_history[i];
+                graph_history[i] = max_val;
             }
         }
 
@@ -157,7 +158,7 @@ int vespercsi_plugin_api_callback(const vespercsi_csi_t* csi) {
     
     double current_score = (total_elements > 0) ? (total_std / total_elements) : 0.0;
 
-    // Apply Squlech / Noise Threshold
+    // Apply Squelch / Noise Threshold
     if (current_score < NOISE_THRESHOLD) {
         current_score = 0.0;
     }
