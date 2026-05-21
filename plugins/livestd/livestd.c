@@ -9,6 +9,12 @@
 #include <unistd.h>
 #include <stdint.h>
 
+#ifdef CONFIG_VESPERCSI_PLUGIN_LIVESTD_FIXED_Y_MAX
+    #define FIXED_Y_MAX CONFIG_VESPERCSI_PLUGIN_LIVESTD_FIXED_Y_MAX
+#else
+    #define FIXED_Y_MAX 16.0
+#endif
+
 vespercsi_plugin_context_t vespercsi_plugin_context;
 
 // --- Configuration ---
@@ -19,7 +25,6 @@ vespercsi_plugin_context_t vespercsi_plugin_context;
 
 // --- Signal Processing Thresholds ---
 #define NOISE_THRESHOLD 0.3 // Ignore standard deviations below this (forces to 0)
-#define FIXED_Y_MAX 10.0    // The absolute maximum STD value for the vertical axis
 
 // Max flattened elements per packet (244 subcarriers * 2 TX * 2 RX = 976)
 #define MAX_ELEMENTS (VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX * VESPERCSI_CSI_SUPPORTED_TX_MAX * VESPERCSI_CSI_SUPPORTED_RX_MAX)

@@ -1,0 +1,9 @@
+menuconfig VESPERCSI_PLUGIN_LIVESTD
+    bool "Live CSI Standard Deviation Graph"
+    default n
+
+
+    config VESPERCSI_PLUGIN_LIVESTD_FIXED_Y_MAX
+        int "Vertical Standard Deviation Length"
+        default 16
+        depends on VESPERCSI_PLUGIN_LIVESTD

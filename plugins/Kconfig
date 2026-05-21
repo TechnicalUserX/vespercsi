@@ -2,4 +2,5 @@
 
 menu "Configure Plugins"
     source "plugins/ir_label/Kconfig"
+    source "plugins/livestd/Kconfig"
 endmenu
