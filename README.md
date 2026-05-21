@@ -2,7 +2,7 @@
 
 **High Performance And Extensible CSI Multitool For Intel AX200/AX210 Wi-Fi Cards**
 
-_VesperCSI is a hard fork of FeitCSI._
+> VesperCSI currently uses the same driver/firmware as FeitCSI, please install necessary driver/firmware to your target machine.
 
 # Dependencies
 
@@ -37,3 +37,7 @@ To access the documentation, you first need to compile it with doxygen:
 ```
 
 Documentation can be accessed via HTML
+
+---
+
+_VesperCSI is a hard fork of FeitCSI._

@@ -19,7 +19,7 @@ PROJECT_BRIEF="High Performance And Extensible CSI Multitool For Intel AX200/AX2
 TARGETS=""
 
 # Available Targets (MODIFY HERE)
-TARGETS_AVAILABLE="vespercsi vespercsi-viewer print-details udp-send ir-label flowrate"
+TARGETS_AVAILABLE="vespercsi vespercsi-viewer print-details udp-send ir-label flowrate livestd"
 
 ########################################
 # Default Source Extensions (MODIFY HERE)
@@ -876,7 +876,16 @@ for target in ${TARGETS}; do
             else
                 config_log FAIL "${PROJECT} Plugin sources: flowrate"
             fi        
-        ;;        
+        ;;    
+
+        livestd)
+            if config_sources "$target" "plugins/livestd"; then
+                config_log PASS "${PROJECT} Plugin sources: livestd"
+            else
+                config_log FAIL "${PROJECT} Plugin sources: livestd"
+            fi        
+        ;;    
+
 
     esac
     

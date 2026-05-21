@@ -166,13 +166,17 @@ ${BUILD_BIN_DIR}/vespercsi: ${VESPERCSI_OBJ}
 vespercsi-install: superuser
 	@$(call build_log, "Installing...")
 	@install --target-directory ${DESTDIR}${PREFIX}/bin ${BUILD_BIN_DIR}/vespercsi
+
+vespercsi-sdk-install:
 	@cp -r "${ROOT_DIR}/include/vespercsi" "${DESTDIR}${PREFIX}/include"
 	@cp -r "${BUILD_HDR_DIR}/vespercsi" "${DESTDIR}${PREFIX}/include"
 
+vespercsi-sdk-uninstall:
+	@rm -rf "${DESTDIR}${PREFIX}/include/vespercsi"
 
 vespercsi-uninstall: superuser
 	@$(call build_log, "Uninstalling...")
 	@rm -f ${DESTDIR}${PREFIX}/bin/vespercsi
-	@rm -rf "${DESTDIR}${PREFIX}/include/vespercsi"
+
 
 $(eval $(call autoconf_include,vespercsi))

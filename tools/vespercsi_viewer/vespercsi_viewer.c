@@ -6,6 +6,14 @@
 #include <stdbool.h>
 #include <time.h> 
 
+// --- POSIX Includes for mmap ---
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#define MAX_UI_ROWS 100 // Cap UI rows per group to prevent GTK freezes
+
 // --- FeitCSI Constants & Bitmasks ---
 #define RATE_MCS_MOD_TYPE_POS 8
 #define RATE_MCS_MOD_TYPE_MSK (0x7 << RATE_MCS_MOD_TYPE_POS)
@@ -62,22 +70,22 @@ typedef struct {
 // --- Application State Model ---
 typedef struct csi_record {
     int global_index;        
-    bool is_deleted;         
     bool has_label;          
     label_header_t label;    
     feit_header_t header;    
     uint8_t raw_header[272]; 
     uint8_t *payload;        
     struct csi_record *next; 
+    GtkWidget *row_action_lbl; 
 } csi_record_t;
 
 typedef struct GroupRecord {
     csi_record_t *rec;
     GtkWidget *row_box;
-    GtkWidget *del_btn;
 } GroupRecord;
 
 struct GroupContext; 
+struct TransitionContext;
 
 typedef struct {
     csi_record_t *head;
@@ -85,13 +93,30 @@ typedef struct {
     bool use_labeled_header;
     int total_records;
     char target_file[1024];
+    
     GtkWidget *main_list_container; 
     GtkWidget *status_label;
-    GtkWidget *header_toggle_btn; // Toggle button reference
+    GtkWidget *header_toggle_btn; 
+    GtkWidget *btn_open;
+    GtkWidget *btn_save;
+    GtkWidget *spinner;
+
     struct GroupContext *group_contexts; 
+    
+    // Arrays for dynamic transitioning
+    csi_record_t **labeled_records;
+    int num_labeled;
+    struct TransitionContext *transitions;
+    int num_transitions;
+    
+    // Efficient memory management for massive files
+    uint8_t *file_data;
+    size_t file_size;
+    csi_record_t *records_array;
+    
 } AppState;
 
-AppState app_state = {NULL, NULL, false, 0, "", NULL, NULL, NULL, NULL};
+AppState app_state = {NULL, NULL, false, 0, "", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, NULL, 0, NULL};
 
 typedef struct GroupContext {
     uint16_t action_index;
@@ -99,13 +124,30 @@ typedef struct GroupContext {
     GroupRecord *records;
     int capacity;
     int count;
-    GtkAdjustment *adj_start;
-    GtkAdjustment *adj_end;
-    GtkWidget *lbl_time_start;
-    GtkWidget *lbl_time_end;
     GtkWidget *expander;        
     struct GroupContext *next;
 } GroupContext;
+
+typedef struct TransitionContext {
+    int transition_idx;
+    int initial_transition_idx; 
+    GtkAdjustment *adj;
+    GtkWidget *lbl_time;
+    struct TransitionContext *prev;
+    struct TransitionContext *next;
+    GroupContext *left_gc;
+    GroupContext *right_gc;
+} TransitionContext;
+
+typedef struct {
+    char filepath[1024];
+    bool success;
+    char err_msg[2048];
+} LoadTask;
+
+
+// --- Forward Declarations ---
+void populate_ui();
 
 
 // --- UI Styling & Label Helpers ---
@@ -142,19 +184,29 @@ const char* get_action_css_class(uint16_t label) {
 static void load_css() {
     GtkCssProvider *provider = gtk_css_provider_new();
     const char *css =
-        /* Container styling to round the outer corners of the joined boxes */
-        ".group-header { border-radius: 6px; overflow: hidden; margin-top: 2px; margin-bottom: 2px; }"
-        /* Left Side: Dark Gray Background */
-        ".group-id-box { background-color: #333333; color: #FFFFFF; padding: 8px 15px; }"
-        /* Right Side: Action Color Codings */
-        ".action-box-nolabel { background-color: #FFFFFF; color: #000000; padding: 8px 15px; }"
-        ".action-box-walk    { background-color: #FFA500; color: #000000; padding: 8px 15px; }"
-        ".action-box-run     { background-color: #00FFFF; color: #000000; padding: 8px 15px; }"
-        ".action-box-jump    { background-color: #FF4444; color: #FFFFFF; padding: 8px 15px; }"
-        ".action-box-still   { background-color: #FFFF00; color: #000000; padding: 8px 15px; }"
-        ".action-box-standup { background-color: #FFC0CB; color: #000000; padding: 8px 15px; }"
-        ".action-box-sitdown { background-color: #FF00FF; color: #FFFFFF; padding: 8px 15px; }"
-        ".action-box-fall    { background-color: #00C851; color: #FFFFFF; padding: 8px 15px; }";
+        /* Deep Gray Segments Theme & Breathing Margins/Padding */
+        "window.dark-window { background-color: #121212; }"
+        ".dark-header { background-color: #1a1a1a; border-bottom: 1px solid #333333; padding: 8px; }"
+        ".dark-panel { background-color: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 12px; padding: 12px; margin: 8px 0px; }"
+        ".dark-row { background-color: #242424; border: 1px solid #2a2a2a; border-radius: 10px; margin-bottom: 6px; padding: 8px; }"
+        ".dark-row:hover { background-color: #2f2f2f; }"
+        ".boundary-box { background-color: #1a1a1a; border: 1px solid #3a3a3a; border-radius: 12px; padding: 15px; margin: 8px 0px; }"
+        
+        /* Functional Components */
+        ".group-header { border-radius: 12px; overflow: hidden; margin-top: 4px; margin-bottom: 4px; }"
+        ".group-id-box { background-color: #333333; color: #FFFFFF; padding: 10px 18px; }"
+        ".action-badge { border-radius: 8px; font-weight: bold; margin: 0 12px; padding: 6px 14px; min-width: 80px; text-align: center; }"
+        
+        ".action-box-nolabel { background-color: #FFFFFF; color: #000000; padding: 10px 18px; }"
+        ".action-box-walk    { background-color: #FFA500; color: #000000; padding: 10px 18px; }"
+        ".action-box-run     { background-color: #00FFFF; color: #000000; padding: 10px 18px; }"
+        ".action-box-jump    { background-color: #FF4444; color: #FFFFFF; padding: 10px 18px; }"
+        ".action-box-still   { background-color: #FFFF00; color: #000000; padding: 10px 18px; }"
+        ".action-box-standup { background-color: #FFC0CB; color: #000000; padding: 10px 18px; }"
+        ".action-box-sitdown { background-color: #FF00FF; color: #FFFFFF; padding: 10px 18px; }"
+        ".action-box-fall    { background-color: #00C851; color: #FFFFFF; padding: 10px 18px; }"
+        
+        ".boundary-separator { min-height: 1px; background-image: none; background-color: #555555; border: none; margin-right: 15px; }";
         
     gtk_css_provider_load_from_string(provider, css);
     gtk_style_context_add_provider_for_display(gdk_display_get_default(), 
@@ -162,7 +214,6 @@ static void load_css() {
                                                GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     g_object_unref(provider);
 }
-
 
 // --- Core Logic ---
 
@@ -242,64 +293,157 @@ void clear_csi_data() {
     }
     app_state.group_contexts = NULL;
 
-    csi_record_t *curr = app_state.head;
-    while (curr) {
-        csi_record_t *next = curr->next;
-        free(curr->payload);
-        free(curr);
-        curr = next;
+    if (app_state.labeled_records) {
+        free(app_state.labeled_records);
+        app_state.labeled_records = NULL;
+    }
+    
+    if (app_state.transitions) {
+        free(app_state.transitions);
+        app_state.transitions = NULL;
+    }
+
+    // Clean up contiguous array and mmap
+    if (app_state.records_array) {
+        free(app_state.records_array);
+        app_state.records_array = NULL;
+    }
+
+    if (app_state.file_data && app_state.file_data != MAP_FAILED) {
+        munmap(app_state.file_data, app_state.file_size);
+        app_state.file_data = NULL;
     }
 
     app_state.head = NULL;
     app_state.tail = NULL;
     app_state.total_records = 0;
+    app_state.num_labeled = 0;
+    app_state.num_transitions = 0;
+    app_state.file_size = 0;
 }
 
-void load_csi_file(const char *filepath) {
-    FILE *fp = fopen(filepath, "rb");
-    if (!fp) {
-        char err_msg[2048];
-        snprintf(err_msg, sizeof(err_msg), "Failed to open file: %s", filepath);
-        gtk_label_set_text(GTK_LABEL(app_state.status_label), err_msg);
-        return;
+gboolean on_load_finished_idle(gpointer data) {
+    LoadTask *task = (LoadTask*)data;
+    
+    gtk_spinner_stop(GTK_SPINNER(app_state.spinner));
+    gtk_widget_set_visible(app_state.spinner, FALSE);
+    
+    gtk_widget_set_sensitive(app_state.btn_open, TRUE);
+    gtk_widget_set_sensitive(app_state.btn_save, TRUE);
+    
+    if (!task->success) {
+        gtk_label_set_text(GTK_LABEL(app_state.status_label), task->err_msg);
+    } else {
+        strncpy(app_state.target_file, task->filepath, sizeof(app_state.target_file) - 1);
+        populate_ui(); 
+    }
+    
+    free(task);
+    return G_SOURCE_REMOVE;
+}
+
+gpointer load_csi_thread_func(gpointer data) {
+    LoadTask *task = (LoadTask*)data;
+    const char *filepath = task->filepath;
+
+    int fd = open(filepath, O_RDONLY);
+    if (fd < 0) {
+        snprintf(task->err_msg, sizeof(task->err_msg), "Failed to open file: %s", filepath);
+        task->success = false;
+        g_idle_add((GSourceFunc)on_load_finished_idle, task);
+        return NULL;
     }
 
-    // Disable the toggle button once a file is opened
-    if (app_state.header_toggle_btn) {
-        gtk_widget_set_sensitive(app_state.header_toggle_btn, FALSE);
+    struct stat st;
+    if (fstat(fd, &st) < 0) {
+        close(fd);
+        snprintf(task->err_msg, sizeof(task->err_msg), "Failed to read file stats.");
+        task->success = false;
+        g_idle_add((GSourceFunc)on_load_finished_idle, task);
+        return NULL;
+    }
+    app_state.file_size = st.st_size;
+
+    app_state.file_data = mmap(NULL, app_state.file_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+
+    if (app_state.file_data == MAP_FAILED) {
+        snprintf(task->err_msg, sizeof(task->err_msg), "Memory mapping failed. File too large or out of memory.");
+        task->success = false;
+        g_idle_add((GSourceFunc)on_load_finished_idle, task);
+        return NULL;
     }
 
-    uint8_t label_buf[4];
+    size_t capacity = 50000; 
+    app_state.records_array = malloc(capacity * sizeof(csi_record_t));
+
+    size_t offset = 0;
     int index = 1;
+    app_state.total_records = 0;
 
-    while (true) {
-        csi_record_t *rec = calloc(1, sizeof(csi_record_t));
+    while (offset < app_state.file_size) {
+        if (app_state.total_records >= capacity) {
+            capacity *= 2;
+            app_state.records_array = realloc(app_state.records_array, capacity * sizeof(csi_record_t));
+        }
+
+        csi_record_t *rec = &app_state.records_array[app_state.total_records];
+        memset(rec, 0, sizeof(csi_record_t));
+        
         rec->has_label = app_state.use_labeled_header;
         rec->global_index = index;
 
         if (rec->has_label) {
-            if (fread(label_buf, 1, 4, fp) != 4) { free(rec); break; }
-            memcpy(&rec->label.action_index, label_buf, 2);
-            memcpy(&rec->label.action_label, label_buf + 2, 2);
+            if (offset + 4 > app_state.file_size) break;
+            memcpy(&rec->label.action_index, app_state.file_data + offset, 2);
+            memcpy(&rec->label.action_label, app_state.file_data + offset + 2, 2);
+            offset += 4;
         }
 
-        if (fread(rec->raw_header, 1, 272, fp) != 272) { free(rec); break; }
+        if (offset + 272 > app_state.file_size) break;
+        memcpy(rec->raw_header, app_state.file_data + offset, 272);
         parse_header(rec->raw_header, &rec->header);
+        offset += 272;
 
-        rec->payload = malloc(rec->header.csi_size);
-        if (fread(rec->payload, 1, rec->header.csi_size, fp) != rec->header.csi_size) {
-            free(rec->payload); free(rec); break;
-        }
+        if (offset + rec->header.csi_size > app_state.file_size) break;
+        
+        rec->payload = app_state.file_data + offset; 
+        offset += rec->header.csi_size;
 
-        if (!app_state.head) app_state.head = rec;
-        if (app_state.tail) app_state.tail->next = rec;
-        app_state.tail = rec;
         app_state.total_records++;
         index++;
     }
-    fclose(fp);
+
+    if (app_state.total_records > 0) {
+        app_state.head = &app_state.records_array[0];
+        for (int i = 0; i < app_state.total_records - 1; i++) {
+            app_state.records_array[i].next = &app_state.records_array[i+1];
+        }
+        app_state.records_array[app_state.total_records - 1].next = NULL;
+        app_state.tail = &app_state.records_array[app_state.total_records - 1];
+    }
     
-    strncpy(app_state.target_file, filepath, sizeof(app_state.target_file) - 1);
+    task->success = true;
+    g_idle_add((GSourceFunc)on_load_finished_idle, task);
+    return NULL;
+}
+
+void start_async_load(const char *filepath) {
+    clear_csi_data(); 
+    
+    gtk_spinner_start(GTK_SPINNER(app_state.spinner));
+    gtk_widget_set_visible(app_state.spinner, TRUE);
+    
+    gtk_widget_set_sensitive(app_state.btn_open, FALSE);
+    gtk_widget_set_sensitive(app_state.btn_save, FALSE);
+    
+    gtk_label_set_text(GTK_LABEL(app_state.status_label), "Loading and Parsing File... Please wait.");
+    
+    LoadTask *task = malloc(sizeof(LoadTask));
+    strncpy(task->filepath, filepath, sizeof(task->filepath)-1);
+    task->success = false;
+    
+    g_thread_new("load_csi", load_csi_thread_func, task);
 }
 
 void save_csi_file(const char *filepath) {
@@ -315,14 +459,12 @@ void save_csi_file(const char *filepath) {
     int saved_count = 0;
     
     while (curr) {
-        if (!curr->is_deleted) {
-            if (curr->has_label) {
-                fwrite(&curr->label, 1, 4, fp);
-            }
-            fwrite(curr->raw_header, 1, 272, fp); 
-            fwrite(curr->payload, 1, curr->header.csi_size, fp);
-            saved_count++;
+        if (curr->has_label) {
+            fwrite(&curr->label, 1, 4, fp);
         }
+        fwrite(curr->raw_header, 1, 272, fp); 
+        fwrite(curr->payload, 1, curr->header.csi_size, fp);
+        saved_count++;
         curr = curr->next;
     }
     fclose(fp);
@@ -402,66 +544,75 @@ static void on_inspect_clicked(GtkButton *button, gpointer user_data) {
     gtk_window_present(GTK_WINDOW(dialog));
 }
 
-static void set_row_delete_state(GroupRecord *grec, bool is_deleted) {
-    grec->rec->is_deleted = is_deleted;
-    if (is_deleted) {
-        gtk_widget_set_opacity(grec->row_box, 0.4);
-        gtk_button_set_label(GTK_BUTTON(grec->del_btn), "Undo Delete");
-    } else {
-        gtk_widget_set_opacity(grec->row_box, 1.0);
-        gtk_button_set_label(GTK_BUTTON(grec->del_btn), "Stage Delete");
-    }
-}
+// --- Boundary Transition Callbacks ---
 
-static void on_single_delete_clicked(GtkButton *button, gpointer user_data) {
-    GroupRecord *grec = (GroupRecord *)user_data;
-    set_row_delete_state(grec, !grec->rec->is_deleted);
-}
-
-// --- Trimming Callbacks ---
-
-static void on_trim_value_changed(GtkAdjustment *adjustment, gpointer user_data) {
-    GroupContext *gc = (GroupContext *)user_data;
+static void update_row_visuals(csi_record_t *r) {
+    if (!r || !r->row_action_lbl) return;
     
-    int start_idx = (int)(gtk_adjustment_get_value(gc->adj_start) + 0.5);
-    int end_idx = (int)(gtk_adjustment_get_value(gc->adj_end) + 0.5);
-
-    if (start_idx > end_idx) {
-        if (adjustment == gc->adj_start) {
-            gtk_adjustment_set_value(gc->adj_start, end_idx);
-            start_idx = end_idx;
-        } else {
-            gtk_adjustment_set_value(gc->adj_end, start_idx);
-            end_idx = start_idx;
-        }
+    gtk_label_set_text(GTK_LABEL(r->row_action_lbl), get_action_name(r->label.action_label));
+    
+    const char* classes[] = {
+        "action-box-nolabel", "action-box-walk", "action-box-run", 
+        "action-box-jump", "action-box-still", "action-box-standup", 
+        "action-box-sitdown", "action-box-fall"
+    };
+    for (int i = 0; i < 8; i++) {
+        gtk_widget_remove_css_class(r->row_action_lbl, classes[i]);
     }
+    gtk_widget_add_css_class(r->row_action_lbl, get_action_css_class(r->label.action_label));
+}
 
+static void on_transition_moved(GtkAdjustment *adjustment, gpointer user_data) {
+    TransitionContext *tc = (TransitionContext *)user_data;
+    int val = (int)(gtk_adjustment_get_value(adjustment) + 0.5);
+    
+    int min_idx = tc->prev ? tc->prev->transition_idx : 0;
+    int max_idx = tc->next ? tc->next->transition_idx : app_state.num_labeled;
+    
+    if (val < min_idx) {
+        val = min_idx;
+        gtk_adjustment_set_value(adjustment, val);
+    } else if (val > max_idx) {
+        val = max_idx;
+        gtk_adjustment_set_value(adjustment, max_idx);
+    }
+    
+    tc->transition_idx = val;
+    
+    uint64_t ts = 0;
+    if (val >= 0 && val < app_state.num_labeled) {
+        ts = app_state.labeled_records[val]->header.timestamp;
+    } else if (val == app_state.num_labeled && val > 0) {
+        ts = app_state.labeled_records[val-1]->header.timestamp;
+    }
+    
     char fmt_ts[128];
     char time_str[256];
-
-    if (start_idx >= 0 && start_idx < gc->count) {
-        uint64_t ts = gc->records[start_idx].rec->header.timestamp;
-        format_timestamp(ts, fmt_ts, sizeof(fmt_ts));
-        snprintf(time_str, sizeof(time_str), "Val: %lu\n<b>%s</b>", ts, fmt_ts);
-        gtk_label_set_markup(GTK_LABEL(gc->lbl_time_start), time_str);
-    }
+    format_timestamp(ts, fmt_ts, sizeof(fmt_ts));
+    snprintf(time_str, sizeof(time_str), "Boundary Time: %lu\n<b>%s</b>", ts, fmt_ts);
+    gtk_label_set_markup(GTK_LABEL(tc->lbl_time), time_str);
     
-    if (end_idx >= 0 && end_idx < gc->count) {
-        uint64_t ts = gc->records[end_idx].rec->header.timestamp;
-        format_timestamp(ts, fmt_ts, sizeof(fmt_ts));
-        snprintf(time_str, sizeof(time_str), "Val: %lu\n<b>%s</b>", ts, fmt_ts);
-        gtk_label_set_markup(GTK_LABEL(gc->lbl_time_end), time_str);
+    // Propagate assignments dynamically based on the current boundaries
+    int start_idx = tc->prev ? tc->prev->transition_idx : 0;
+    int end_idx = tc->next ? tc->next->transition_idx : app_state.num_labeled;
+    
+    for (int i = start_idx; i < val; i++) {
+        app_state.labeled_records[i]->label.action_index = tc->left_gc->action_index;
+        app_state.labeled_records[i]->label.action_label = tc->left_gc->action_label;
+        update_row_visuals(app_state.labeled_records[i]);
     }
-
-    for (int i = 0; i < gc->count; i++) {
-        bool is_outside_bounds = (i < start_idx || i > end_idx);
-        if (gc->records[i].rec->is_deleted != is_outside_bounds) {
-            set_row_delete_state(&gc->records[i], is_outside_bounds);
-        }
+    for (int i = val; i < end_idx; i++) {
+        app_state.labeled_records[i]->label.action_index = tc->right_gc->action_index;
+        app_state.labeled_records[i]->label.action_label = tc->right_gc->action_label;
+        update_row_visuals(app_state.labeled_records[i]);
     }
 }
 
-// --- Group Chronological Comparator ---
+static void on_transition_reset_clicked(GtkButton *button, gpointer user_data) {
+    TransitionContext *tc = (TransitionContext *)user_data;
+    gtk_adjustment_set_value(tc->adj, tc->initial_transition_idx);
+}
+
 int compare_groups_chronologically(const void *a, const void *b) {
     GroupContext *g1 = *(GroupContext **)a;
     GroupContext *g2 = *(GroupContext **)b;
@@ -479,7 +630,7 @@ int compare_groups_chronologically(const void *a, const void *b) {
 void populate_ui() {
     csi_record_t *curr = app_state.head;
     
-    // Phase 1: Contiguous Grouping Data
+    // Phase 1: Contiguous Grouping Data (Extracting Base Groups)
     while (curr) {
         if (curr->has_label) {
             GroupContext *tail_gc = app_state.group_contexts;
@@ -490,7 +641,6 @@ void populate_ui() {
             }
 
             GroupContext *gc = NULL;
-            
             if (tail_gc != NULL && 
                 tail_gc->action_index == curr->label.action_index && 
                 tail_gc->action_label == curr->label.action_label) {
@@ -550,89 +700,83 @@ void populate_ui() {
 
         free(gc_array);
     }
+    
+    // Phase 1.8: Setup Boundary/Transition Structs
+    app_state.num_labeled = 0;
+    temp_gc = app_state.group_contexts;
+    while(temp_gc) { 
+        app_state.num_labeled += temp_gc->count; 
+        temp_gc = temp_gc->next; 
+    }
+    
+    if (app_state.num_labeled > 0) {
+        app_state.labeled_records = malloc(app_state.num_labeled * sizeof(csi_record_t*));
+        int idx = 0;
+        temp_gc = app_state.group_contexts;
+        while(temp_gc) {
+            for(int i = 0; i < temp_gc->count; i++) {
+                app_state.labeled_records[idx++] = temp_gc->records[i].rec;
+            }
+            temp_gc = temp_gc->next;
+        }
+    }
+    
+    if (num_groups > 1) {
+        app_state.num_transitions = num_groups - 1;
+        app_state.transitions = calloc(app_state.num_transitions, sizeof(TransitionContext));
+        
+        GroupContext *left = app_state.group_contexts;
+        int accum_idx = 0;
+        for (int i = 0; i < app_state.num_transitions; i++) {
+            GroupContext *right = left->next;
+            accum_idx += left->count;
+            
+            app_state.transitions[i].transition_idx = accum_idx;
+            app_state.transitions[i].initial_transition_idx = accum_idx;
+            app_state.transitions[i].left_gc = left;
+            app_state.transitions[i].right_gc = right;
+            app_state.transitions[i].prev = (i > 0) ? &app_state.transitions[i-1] : NULL;
+            app_state.transitions[i].next = (i < app_state.num_transitions - 1) ? &app_state.transitions[i+1] : NULL;
+            
+            left = right;
+        }
+    }
 
     // Phase 2: Building UI
     GroupContext *gc = app_state.group_contexts;
+    int g_idx = 0;
     while (gc != NULL) {
         gc->expander = gtk_expander_new(NULL);
-        gtk_widget_set_margin_start(gc->expander, 10);
-        gtk_widget_set_margin_end(gc->expander, 10);
-        gtk_widget_set_margin_top(gc->expander, 5);
-        gtk_widget_set_margin_bottom(gc->expander, 5);
 
         GtkWidget *inner_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+        gtk_widget_add_css_class(inner_vbox, "dark-panel"); 
         gtk_expander_set_child(GTK_EXPANDER(gc->expander), inner_vbox);
 
-        if (gc->count > 0) {
-            GtkWidget *trim_frame = gtk_frame_new("Trim Group Data Interval (Auto-Applies)");
-            gtk_widget_set_margin_start(trim_frame, 5);
-            gtk_widget_set_margin_end(trim_frame, 5);
-            gtk_widget_set_margin_top(trim_frame, 5);
-            gtk_widget_set_margin_bottom(trim_frame, 10);
-
-            GtkWidget *trim_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-            gtk_widget_set_margin_start(trim_vbox, 10);
-            gtk_widget_set_margin_end(trim_vbox, 10);
-            gtk_widget_set_margin_top(trim_vbox, 10);
-            gtk_widget_set_margin_bottom(trim_vbox, 10);
-            gtk_frame_set_child(GTK_FRAME(trim_frame), trim_vbox);
-
-            gc->adj_start = gtk_adjustment_new(0, 0, gc->count - 1, 1, 10, 0);
-            gc->adj_end = gtk_adjustment_new(gc->count - 1, 0, gc->count - 1, 1, 10, 0);
-
-            g_signal_connect(gc->adj_start, "value-changed", G_CALLBACK(on_trim_value_changed), gc);
-            g_signal_connect(gc->adj_end, "value-changed", G_CALLBACK(on_trim_value_changed), gc);
-
-            GtkWidget *hbox_start = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-            gtk_box_append(GTK_BOX(hbox_start), gtk_label_new("Start Index:"));
-            GtkWidget *spin_start = gtk_spin_button_new(gc->adj_start, 1, 0);
-            gtk_box_append(GTK_BOX(hbox_start), spin_start);
-            GtkWidget *scale_start = gtk_scale_new(GTK_ORIENTATION_HORIZONTAL, gc->adj_start);
-            
-            gtk_scale_set_digits(GTK_SCALE(scale_start), 0);
-            gtk_range_set_round_digits(GTK_RANGE(scale_start), 0);
-            
-            gtk_widget_set_hexpand(scale_start, TRUE);
-            gtk_scale_set_draw_value(GTK_SCALE(scale_start), FALSE);
-            gtk_box_append(GTK_BOX(hbox_start), scale_start);
-            gc->lbl_time_start = gtk_label_new("Time: N/A");
-            gtk_widget_set_size_request(gc->lbl_time_start, 240, -1);
-            gtk_label_set_xalign(GTK_LABEL(gc->lbl_time_start), 0.0);
-            gtk_box_append(GTK_BOX(hbox_start), gc->lbl_time_start);
-            gtk_box_append(GTK_BOX(trim_vbox), hbox_start);
-
-            GtkWidget *hbox_end = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-            gtk_box_append(GTK_BOX(hbox_end), gtk_label_new("End Index: "));
-            GtkWidget *spin_end = gtk_spin_button_new(gc->adj_end, 1, 0);
-            gtk_box_append(GTK_BOX(hbox_end), spin_end);
-            GtkWidget *scale_end = gtk_scale_new(GTK_ORIENTATION_HORIZONTAL, gc->adj_end);
-            
-            gtk_scale_set_digits(GTK_SCALE(scale_end), 0);
-            gtk_range_set_round_digits(GTK_RANGE(scale_end), 0);
-            
-            gtk_widget_set_hexpand(scale_end, TRUE);
-            gtk_scale_set_draw_value(GTK_SCALE(scale_end), FALSE);
-            gtk_box_append(GTK_BOX(hbox_end), scale_end);
-            gc->lbl_time_end = gtk_label_new("Time: N/A");
-            gtk_widget_set_size_request(gc->lbl_time_end, 240, -1);
-            gtk_label_set_xalign(GTK_LABEL(gc->lbl_time_end), 0.0);
-            gtk_box_append(GTK_BOX(hbox_end), gc->lbl_time_end);
-            gtk_box_append(GTK_BOX(trim_vbox), hbox_end);
-
-            gtk_box_append(GTK_BOX(inner_vbox), trim_frame);
-
-            on_trim_value_changed(gc->adj_start, gc);
-        }
-
         GtkWidget *list_box = gtk_list_box_new();
+        gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_box), GTK_SELECTION_NONE);
+        
+        // Virtualized / Capped UI Rendering
         for (int i = 0; i < gc->count; i++) {
+            bool show_row = (i < MAX_UI_ROWS / 2) || (i >= gc->count - (MAX_UI_ROWS / 2));
+            if (gc->count <= MAX_UI_ROWS) show_row = true;
+            
+            if (!show_row) {
+                if (i == MAX_UI_ROWS / 2) {
+                    GtkWidget *ph_lbl = gtk_label_new(NULL);
+                    char ph[128];
+                    snprintf(ph, sizeof(ph), "<i>... %d records omitted for UI performance ...</i>", gc->count - MAX_UI_ROWS);
+                    gtk_label_set_markup(GTK_LABEL(ph_lbl), ph);
+                    gtk_widget_set_margin_top(ph_lbl, 10);
+                    gtk_widget_set_margin_bottom(ph_lbl, 10);
+                    gtk_list_box_append(GTK_LIST_BOX(list_box), ph_lbl);
+                }
+                continue; 
+            }
+
             csi_record_t *r = gc->records[i].rec;
 
             GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 15);
-            gtk_widget_set_margin_start(row_box, 10);
-            gtk_widget_set_margin_end(row_box, 10);
-            gtk_widget_set_margin_top(row_box, 5);
-            gtk_widget_set_margin_bottom(row_box, 5);
+            gtk_widget_add_css_class(row_box, "dark-row");
 
             char label_text[512];
             snprintf(label_text, sizeof(label_text), 
@@ -644,31 +788,28 @@ void populate_ui() {
             gtk_widget_set_hexpand(info_label, TRUE);
             gtk_widget_set_halign(info_label, GTK_ALIGN_START);
             gtk_box_append(GTK_BOX(row_box), info_label);
+            
+            GtkWidget *action_badge = gtk_label_new(get_action_name(r->label.action_label));
+            gtk_widget_add_css_class(action_badge, "action-badge");
+            gtk_widget_add_css_class(action_badge, get_action_css_class(r->label.action_label));
+            r->row_action_lbl = action_badge;
+            gtk_box_append(GTK_BOX(row_box), action_badge);
 
             GtkWidget *inspect_btn = gtk_button_new_with_label("Inspect");
             g_signal_connect(inspect_btn, "clicked", G_CALLBACK(on_inspect_clicked), r);
             gtk_box_append(GTK_BOX(row_box), inspect_btn);
 
-            GtkWidget *del_btn = gtk_button_new_with_label("Stage Delete");
-            
             gc->records[i].row_box = row_box;
-            gc->records[i].del_btn = del_btn;
-            
-            g_signal_connect(del_btn, "clicked", G_CALLBACK(on_single_delete_clicked), &gc->records[i]);
-            gtk_box_append(GTK_BOX(row_box), del_btn);
-
             gtk_list_box_append(GTK_LIST_BOX(list_box), row_box);
         }
         
         gtk_box_append(GTK_BOX(inner_vbox), list_box);
-        gtk_box_append(GTK_BOX(app_state.main_list_container), gc->expander);
-
-        // --- NEW CSS RECTANGULAR HEADER LOGIC ---
+        
         char left_text[128];
         snprintf(left_text, sizeof(left_text), "<b>Group %d</b>", gc->action_index);
 
         char right_text[256];
-        snprintf(right_text, sizeof(right_text), "<b>Action: %s (%d)</b>  <i>(%d records)</i>", 
+        snprintf(right_text, sizeof(right_text), "<b>Initial Category: %s (%d)</b>  <i>(%d records)</i>", 
                  get_action_name(gc->action_label), gc->action_label, gc->count);
 
         GtkWidget *header_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -688,21 +829,99 @@ void populate_ui() {
         gtk_box_append(GTK_BOX(header_box), lbl_right);
 
         gtk_expander_set_label_widget(GTK_EXPANDER(gc->expander), header_box);
-        // ----------------------------------------
+        gtk_box_append(GTK_BOX(app_state.main_list_container), gc->expander);
 
+        if (g_idx < app_state.num_transitions) {
+            TransitionContext *tc = &app_state.transitions[g_idx];
+            
+            GtkWidget *b_expander = gtk_expander_new(NULL);
+            
+            GtkWidget *b_lbl_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+            gtk_widget_set_hexpand(b_lbl_box, TRUE);
+            
+            GtkWidget *b_lbl = gtk_label_new(NULL);
+            gtk_label_set_markup(GTK_LABEL(b_lbl), "<b>Boundaries</b>");
+            gtk_box_append(GTK_BOX(b_lbl_box), b_lbl);
+            
+            GtkWidget *b_sep = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+            gtk_widget_set_hexpand(b_sep, TRUE);
+            gtk_widget_set_valign(b_sep, GTK_ALIGN_CENTER);
+            gtk_widget_add_css_class(b_sep, "boundary-separator");
+            gtk_box_append(GTK_BOX(b_lbl_box), b_sep);
+            
+            gtk_expander_set_label_widget(GTK_EXPANDER(b_expander), b_lbl_box);
+            
+            GtkWidget *b_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+            gtk_widget_add_css_class(b_box, "boundary-box");
+            gtk_expander_set_child(GTK_EXPANDER(b_expander), b_box);
+            
+            char b_title[256];
+            snprintf(b_title, sizeof(b_title), "<b>Boundary Split: %s </b><span alpha='50%%'>&#8596;</span><b> %s</b>", 
+                     get_action_name(tc->left_gc->action_label),
+                     get_action_name(tc->right_gc->action_label));
+                     
+            GtkWidget *lbl_title = gtk_label_new(NULL);
+            gtk_label_set_markup(GTK_LABEL(lbl_title), b_title);
+            gtk_widget_set_halign(lbl_title, GTK_ALIGN_CENTER);
+            gtk_box_append(GTK_BOX(b_box), lbl_title);
+            
+            tc->adj = gtk_adjustment_new(tc->transition_idx, 0, app_state.num_labeled, 1, 10, 0);
+            g_signal_connect(tc->adj, "value-changed", G_CALLBACK(on_transition_moved), tc);
+            
+            GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+            
+            GtkWidget *scale = gtk_scale_new(GTK_ORIENTATION_HORIZONTAL, tc->adj);
+            gtk_scale_set_digits(GTK_SCALE(scale), 0);
+            gtk_range_set_round_digits(GTK_RANGE(scale), 0);
+            gtk_widget_set_hexpand(scale, TRUE);
+            gtk_scale_set_draw_value(GTK_SCALE(scale), FALSE);
+            gtk_box_append(GTK_BOX(hbox), scale);
+            
+            GtkWidget *spin = gtk_spin_button_new(tc->adj, 1, 0);
+            gtk_box_append(GTK_BOX(hbox), spin);
+            
+            GtkWidget *reset_btn = gtk_button_new_with_label("Reset");
+            g_signal_connect(reset_btn, "clicked", G_CALLBACK(on_transition_reset_clicked), tc);
+            gtk_box_append(GTK_BOX(hbox), reset_btn);
+
+            tc->lbl_time = gtk_label_new("Boundary Time: N/A");
+            gtk_widget_set_size_request(tc->lbl_time, 240, -1);
+            gtk_box_append(GTK_BOX(hbox), tc->lbl_time);
+            
+            gtk_box_append(GTK_BOX(b_box), hbox);
+            
+            gtk_box_append(GTK_BOX(app_state.main_list_container), b_expander);
+            
+            on_transition_moved(tc->adj, tc);
+        }
+
+        g_idx++;
         gc = gc->next;
     }
 
+    // Unlabeled list capping
     GtkWidget *unlabeled_list = NULL;
     curr = app_state.head;
+    int unlabeled_rendered = 0;
     while(curr) {
         if (!curr->has_label) {
             if (unlabeled_list == NULL) {
                 unlabeled_list = gtk_list_box_new();
+                gtk_list_box_set_selection_mode(GTK_LIST_BOX(unlabeled_list), GTK_SELECTION_NONE);
                 gtk_box_append(GTK_BOX(app_state.main_list_container), unlabeled_list);
             }
+            
+            if (unlabeled_rendered >= MAX_UI_ROWS) {
+                GtkWidget *ph_lbl = gtk_label_new("<i>... remaining unlabeled records omitted for UI performance ...</i>");
+                gtk_label_set_use_markup(GTK_LABEL(ph_lbl), TRUE);
+                gtk_widget_set_margin_top(ph_lbl, 10);
+                gtk_widget_set_margin_bottom(ph_lbl, 10);
+                gtk_list_box_append(GTK_LIST_BOX(unlabeled_list), ph_lbl);
+                break; 
+            }
+
             GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 15);
-            gtk_widget_set_margin_start(row_box, 10); gtk_widget_set_margin_end(row_box, 10);
+            gtk_widget_add_css_class(row_box, "dark-row");
             
             char label_text[512];
             snprintf(label_text, sizeof(label_text), "[Global: %04d] MAC: %s | %s | %sMHz", 
@@ -716,12 +935,8 @@ void populate_ui() {
             g_signal_connect(inspect_btn, "clicked", G_CALLBACK(on_inspect_clicked), curr);
             gtk_box_append(GTK_BOX(row_box), inspect_btn);
 
-            GroupRecord *grec = malloc(sizeof(GroupRecord)); 
-            grec->rec = curr; grec->row_box = row_box; grec->del_btn = gtk_button_new_with_label("Stage Delete");
-            g_signal_connect(grec->del_btn, "clicked", G_CALLBACK(on_single_delete_clicked), grec);
-            gtk_box_append(GTK_BOX(row_box), grec->del_btn);
-
             gtk_list_box_append(GTK_LIST_BOX(unlabeled_list), row_box);
+            unlabeled_rendered++;
         }
         curr = curr->next;
     }
@@ -730,8 +945,6 @@ void populate_ui() {
     snprintf(status_msg, sizeof(status_msg), "Loaded %d records from %s", app_state.total_records, app_state.target_file);
     gtk_label_set_text(GTK_LABEL(app_state.status_label), status_msg);
 }
-
-
 
 // --- Menu Bar / Dialog Callbacks ---
 
@@ -743,9 +956,7 @@ static void on_open_ready(GObject *source_object, GAsyncResult *res, gpointer us
     
     if (file != NULL) {
         char *filepath = g_file_get_path(file);
-        clear_csi_data();
-        load_csi_file(filepath);
-        populate_ui();
+        start_async_load(filepath);
         g_free(filepath);
         g_object_unref(file);
     } else {
@@ -794,11 +1005,17 @@ static void on_action_save_as(GSimpleAction *action, GVariant *parameter, gpoint
     g_object_unref(dialog);
 }
 
+static void on_action_exit(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    GtkWindow *window = GTK_WINDOW(user_data);
+    gtk_window_destroy(window);
+}
+
 // --- GTK4 Application Activation ---
 static void on_activate(GtkApplication *app, gpointer user_data) {
     load_css();
 
     GtkWidget *window = gtk_application_window_new(app);
+    gtk_widget_add_css_class(window, "dark-window");
     gtk_window_set_title(GTK_WINDOW(window), "VesperCSI Viewer");
     gtk_window_set_default_size(GTK_WINDOW(window), 1000, 700); 
 
@@ -813,6 +1030,10 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     g_signal_connect(act_save_as, "activate", G_CALLBACK(on_action_save_as), window);
     g_action_map_add_action(G_ACTION_MAP(window), G_ACTION(act_save_as));
 
+    GSimpleAction *act_exit = g_simple_action_new("exit", NULL);
+    g_signal_connect(act_exit, "activate", G_CALLBACK(on_action_exit), window);
+    g_action_map_add_action(G_ACTION_MAP(window), G_ACTION(act_exit));
+
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_window_set_child(GTK_WINDOW(window), vbox);
 
@@ -820,28 +1041,28 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     GMenu *file_menu = g_menu_new();
     g_menu_append(file_menu, "Open...", "win.open");
     g_menu_append(file_menu, "Save As...", "win.save-as");
+    g_menu_append(file_menu, "Exit", "win.exit");
     g_menu_append_submenu(menubar, "File", G_MENU_MODEL(file_menu));
 
     GtkWidget *menu_widget = gtk_popover_menu_bar_new_from_model(G_MENU_MODEL(menubar));
     gtk_box_append(GTK_BOX(vbox), menu_widget);
 
     GtkWidget *header_bar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-    gtk_widget_set_margin_start(header_bar, 10);
-    gtk_widget_set_margin_end(header_bar, 10);
-    gtk_widget_set_margin_top(header_bar, 10);
-    gtk_widget_set_margin_bottom(header_bar, 10);    
+    gtk_widget_add_css_class(header_bar, "dark-header");
     
-    GtkWidget *btn_save = gtk_button_new_with_label("Commit Changes");
-    gtk_widget_add_css_class(btn_save, "suggested-action"); 
-    g_signal_connect(btn_save, "clicked", G_CALLBACK(on_action_save_as), window);
-    gtk_box_append(GTK_BOX(header_bar), btn_save);
+    app_state.btn_open = gtk_button_new_with_label("Open CSI File");
+    g_signal_connect(app_state.btn_open, "clicked", G_CALLBACK(on_action_open), window);
+    gtk_box_append(GTK_BOX(header_bar), app_state.btn_open);
+    
+    app_state.btn_save = gtk_button_new_with_label("Commit Changes");
+    // Removed "suggested-action" so it inherits the normal button color
+    g_signal_connect(app_state.btn_save, "clicked", G_CALLBACK(on_action_save_as), window);
+    gtk_box_append(GTK_BOX(header_bar), app_state.btn_save);
 
-    // --- NEW: Header Toggle Button ---
     app_state.header_toggle_btn = gtk_toggle_button_new_with_label("Expect Labeled Header");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app_state.header_toggle_btn), app_state.use_labeled_header);
     g_signal_connect(app_state.header_toggle_btn, "toggled", G_CALLBACK(on_header_toggle_changed), NULL);
     gtk_box_append(GTK_BOX(header_bar), app_state.header_toggle_btn);
-    // ---------------------------------
     
     app_state.status_label = gtk_label_new("Ready");
     gtk_widget_set_hexpand(app_state.status_label, TRUE);
@@ -850,16 +1071,33 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
 
     gtk_box_append(GTK_BOX(vbox), header_bar);
 
+    // --- Overlay & Scrolled Window ---
+    GtkWidget *overlay = gtk_overlay_new();
+    gtk_widget_set_vexpand(overlay, TRUE);
+    gtk_box_append(GTK_BOX(vbox), overlay);
+
     GtkWidget *scrolled_window = gtk_scrolled_window_new();
-    gtk_widget_set_vexpand(scrolled_window, TRUE);
-    gtk_box_append(GTK_BOX(vbox), scrolled_window);
+    gtk_overlay_set_child(GTK_OVERLAY(overlay), scrolled_window);
 
     app_state.main_list_container = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    // Added breathing room margins to the main layout
+    gtk_widget_set_margin_start(app_state.main_list_container, 15);
+    gtk_widget_set_margin_end(app_state.main_list_container, 15);
+    gtk_widget_set_margin_top(app_state.main_list_container, 10);
+    gtk_widget_set_margin_bottom(app_state.main_list_container, 10);
+    
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), app_state.main_list_container);
 
+    // --- Center Spinner overlaying the data area ---
+    app_state.spinner = gtk_spinner_new();
+    gtk_widget_set_halign(app_state.spinner, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(app_state.spinner, GTK_ALIGN_CENTER);
+    gtk_widget_set_size_request(app_state.spinner, 80, 80); 
+    gtk_overlay_add_overlay(GTK_OVERLAY(overlay), app_state.spinner);
+    gtk_widget_set_visible(app_state.spinner, FALSE);
+
     if (strlen(app_state.target_file) > 0) {
-        load_csi_file(app_state.target_file); 
-        populate_ui();
+        start_async_load(app_state.target_file); 
     } else {
         gtk_label_set_text(GTK_LABEL(app_state.status_label), "No input file provided.");
     }
