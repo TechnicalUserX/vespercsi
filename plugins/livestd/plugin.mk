@@ -1,6 +1,6 @@
 livestd: ${BUILD_BIN_DIR}/livestd.vesper
 livestd: CFLAGS=-I"${ROOT_DIR}/include" -fPIC
-livestd: LDFLAGS=-shared
+livestd: LDFLAGS=-shared -lm
 
 ${BUILD_BIN_DIR}/livestd.vesper: ${LIVESTD_OBJ}
 	@$(call build_log, ${CC} <objects> -o $@)
