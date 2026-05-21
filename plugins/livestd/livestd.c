@@ -35,7 +35,8 @@ double graph_history[PLOT_WIDTH] = {0};
 
 // --- Terminal Rendering Function ---
 void* render_loop(void* arg) {
-    char screen_buffer[(PLOT_WIDTH + 15) * PLOT_HEIGHT + 200]; 
+    // FIX: 64KB buffer. Plenty of room for all ANSI escape sequences and UTF-8 characters.
+    char screen_buffer[65536]; 
     
     while (plugin_running) {
         pthread_mutex_lock(&data_lock);
@@ -81,7 +82,7 @@ void* render_loop(void* arg) {
 // --- VesperCSI API Implementation ---
 
 int vespercsi_plugin_api_init(vespercsi_plugin_context_t* context) {
-    // 1. Immediately clear the screen and set cursor to top-left
+    // Immediately clear the screen and set cursor to top-left
     printf("\033[2J\033[H");
     fflush(stdout);
 
@@ -100,7 +101,6 @@ int vespercsi_plugin_api_init(vespercsi_plugin_context_t* context) {
         return VESPERCSI_FAIL;
     }
 
-    // Using INFO instead of OK based on level.h
     LOG(INFO, "livestd: Live plotting plugin initialized successfully.");
     return VESPERCSI_OK;
 }
@@ -172,7 +172,6 @@ int vespercsi_plugin_api_destroy(void) {
     printf("\033[2J\033[H");
     fflush(stdout);
     
-    // Using INFO instead of OK based on level.h
     LOG(INFO, "livestd: Plugin destroyed gracefully.");
     return VESPERCSI_OK;
 }
