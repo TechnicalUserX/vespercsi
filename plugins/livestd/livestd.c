@@ -21,8 +21,9 @@ vespercsi_plugin_context_t vespercsi_plugin_context;
 #define MAX_PACKETS_PER_TICK 1000 
 
 // --- Signal Processing Thresholds ---
+#define NOISE_BASELINE 16.5 // Baseline noise floor of empty room (tune this!)
 #define NOISE_THRESHOLD 0.3 // Ignore standard deviations below this (forces to 0)
-#define FIXED_Y_MAX 10.0    // The absolute maximum STD value for the vertical axis
+#define FIXED_Y_MAX 30.0    // Maximum visual spike height after baseline subtraction
 
 // Max flattened elements per packet (244 subcarriers * 2 TX * 2 RX = 976)
 #define MAX_ELEMENTS (VESPERCSI_CSI_SUPPORTED_SUBCARRIERS_MAX * VESPERCSI_CSI_SUPPORTED_TX_MAX * VESPERCSI_CSI_SUPPORTED_RX_MAX)
@@ -72,6 +73,14 @@ void* render_loop(void* arg) {
 
         // Empty the bucket for the next 100ms cycle
         packet_count = 0;
+
+        // NEW: Subtract the hardware noise floor!
+        current_score -= NOISE_BASELINE;
+        
+        // If the score drops below 0 (room is quieter than average), lock it to 0
+        if (current_score < 0.0) {
+            current_score = 0.0;
+        }
 
         // Apply Squelch / Noise Threshold
         if (current_score < NOISE_THRESHOLD) {
