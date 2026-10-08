@@ -3,12 +3,12 @@ If:
 
 CompileFlags:
     Add:
-        - -I/home/tux/VesperTUX/vespercsi/src
-        - -I/home/tux/VesperTUX/vespercsi/lib
+        - -I/home/a403/vespercsi/src
+        - -I/home/a403/vespercsi/lib
         - -I/usr/include
         - -I/usr/include/libnl3
-        - -I/home/tux/VesperTUX/vespercsi/build/include
-        - -I/home/tux/VesperTUX/vespercsi/include
+        - -I/home/a403/vespercsi/build/include
+        - -I/home/a403/vespercsi/include
 
     Compiler: clang
 
@@ -19,7 +19,7 @@ If:
     
 CompileFlags:
     Add:
-        - -I/home/tux/VesperTUX/vespercsi/include
+        - -I/home/a403/vespercsi/include
 
 ---
 
@@ -69,4 +69,4 @@ If:
     
 CompileFlags:
     Add:
-        - -I/home/tux/VesperTUX/vespercsi/include
+        - -I/home/a403/vespercsi/include

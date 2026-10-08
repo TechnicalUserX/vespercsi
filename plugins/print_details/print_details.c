@@ -53,7 +53,7 @@ int vespercsi_plugin_api_callback(const vespercsi_csi_t* csi){
             strcpy(format_str, "HE");
             break;
         case VESPERCSI_RATE_MCS_LEGACY_OFDM_MSK:
-            strcpy(format_str, "Legayc OFDM");
+            strcpy(format_str, "Legacy OFDM");
             break;
         case VESPERCSI_RATE_MCS_EHT_MSK:
             strcpy(format_str, "EHT");
